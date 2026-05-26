@@ -26,6 +26,8 @@ func (e *errRetryable) Error() string {
 func (e *errRetryable) RetryAfter() time.Duration { return e.retryAfter }
 
 // errAuth is returned on HTTP 401 (unauthorized, no CAPTCHA).
+// It satisfies the tracker.AuthError interface so the sync package can classify
+// poll failures without importing jira-specific types.
 type errAuth struct {
 	statusCode int
 }
@@ -33,6 +35,9 @@ type errAuth struct {
 func (e *errAuth) Error() string {
 	return fmt.Sprintf("tracker: auth error %d", e.statusCode)
 }
+
+// IsAuthError implements tracker.AuthError.
+func (e *errAuth) IsAuthError() bool { return true }
 
 // errCAPTCHA is returned when the Jira CAPTCHA lockout header is present.
 // Resolution: the user must log in via browser to clear the CAPTCHA.
