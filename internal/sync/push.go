@@ -23,6 +23,13 @@ type Result struct {
 	// to the correct column without an extra round-trip (T-031).
 	// INVARIANT: always non-empty when Conflict == true.
 	ServerStatus string
+
+	// DryRun is true when the caller invoked Push with dryRun=true. In this mode
+	// no tracker call is made and no state is mutated; the UI must snap the card
+	// back to its prior column and surface a non-modal toast.
+	// INVARIANT: when DryRun==true, Conflict==false and ServerStatus is the
+	// pre-push LastKnownStatus (so the UI has a snap-back target without inferring it).
+	DryRun bool
 }
 
 // Push executes a column-transition intent for the given ticket.
@@ -31,6 +38,12 @@ type Result struct {
 // calls tracker.TransitionStatus. On success it writes the new status into state via
 // store.Mutate. On ErrConflict or ErrInvalidTransition it returns Result{Conflict:true}
 // without mutating state (the UI snaps back using Result.ServerStatus).
+//
+// When dryRun is true, Push is a no-op against the tracker: TransitionStatus is NOT
+// called, state is NOT mutated, and Result{DryRun:true, ServerStatus:<lastKnownStatus>}
+// is returned so the UI can snap back and toast. This is the single chokepoint that
+// enforces read-only mode — every code path that writes to the tracker MUST go through
+// Push, and this guard runs before any tracker method invocation.
 //
 // The targetStatus is a tracker-native status name resolved upstream by the UI.
 // On any conflict variant, the returned error is nil — conflict is a normal application
@@ -41,6 +54,7 @@ func Push(
 	tr           tracker.IssueTracker,
 	ticketID     string,
 	targetStatus string, // tracker-native status name resolved upstream by the UI
+	dryRun       bool,
 ) (Result, error) {
 	snap, _ := store.Snapshot()
 
@@ -49,6 +63,15 @@ func Push(
 		return Result{}, fmt.Errorf("push: ticket %q not found in state", ticketID)
 	}
 	expectedFrom := ticket.LastKnownStatus
+
+	// Dry-run gate — MUST run before any tracker.TransitionStatus call.
+	// No tracker method is invoked and no state.Store.Mutate is issued.
+	if dryRun {
+		return Result{
+			DryRun:       true,
+			ServerStatus: expectedFrom,
+		}, nil
+	}
 
 	err := tr.TransitionStatus(ctx, ticketID, expectedFrom, targetStatus)
 	if err != nil {
