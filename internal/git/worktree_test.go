@@ -65,47 +65,26 @@ func TestIsValidWorktree(t *testing.T) {
 
 func TestSanitizeBranchName(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name  string
+		input string
+		want  string
 	}{
-		{
-			name:     "simple name unchanged",
-			input:    "my-branch",
-			expected: "my-branch",
-		},
-		{
-			name:     "strips refs/heads/ prefix",
-			input:    "refs/heads/my-branch",
-			expected: "my-branch",
-		},
-		{
-			name:     "strips agent/ prefix",
-			input:    "agent/my-task",
-			expected: "my-task",
-		},
-		{
-			name:     "strips feature/ prefix",
-			input:    "feature/new-thing",
-			expected: "new-thing",
-		},
-		{
-			name:     "replaces slashes with dashes",
-			input:    "user/feature/thing",
-			expected: "user-feature-thing",
-		},
-		{
-			name:     "combines prefix stripping and slash replacement",
-			input:    "refs/heads/feature/my/nested/branch",
-			expected: "my-nested-branch",
-		},
+		{"simple", "fix-bug", "fix-bug"},
+		{"uppercase", "Refactor Attempt!", "refactor-attempt"},
+		{"spaces", "My Feature Branch", "my-feature-branch"},
+		{"special chars", "feat: add @new function", "feat-add-new-function"},
+		{"consecutive dashes", "a--b---c", "a-b-c"},
+		{"leading trailing dashes", "-foo-", "foo"},
+		{"numbers and dots", "v1.2.3-beta", "v1.2.3-beta"},
+		{"already lowercase safe", "my-branch", "my-branch"},
+		{"underscore preserved", "my_branch", "my_branch"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeBranchName(tt.input)
-			if result != tt.expected {
-				t.Errorf("sanitizeBranchName(%q) = %q; want %q", tt.input, result, tt.expected)
+			got := sanitizeBranchName(tt.input)
+			if got != tt.want {
+				t.Errorf("sanitizeBranchName(%q) = %q; want %q", tt.input, got, tt.want)
 			}
 		})
 	}
