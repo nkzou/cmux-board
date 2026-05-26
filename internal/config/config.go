@@ -12,13 +12,14 @@ const SchemaVersionCurrent = 2
 
 // Config is stored at ~/.config/cmux-board/config.json (mode 0644).
 type Config struct {
-	SchemaVersion       int                `json:"schema_version"`
-	Adapter             string             `json:"adapter"`                       // "jira"
-	AdapterConfig       map[string]any     `json:"adapter_config,omitempty"`
-	Repos               map[string]RepoEntry `json:"repos,omitempty"`             // keyed by repo_id
-	PollIntervalSeconds int                `json:"poll_interval_seconds,omitempty"`
-	WorktreeBaseDir     string             `json:"worktree_base_dir,omitempty"`
-	Claude              ClaudeConfig       `json:"claude,omitempty"`
+	SchemaVersion       int                  `json:"schema_version"`
+	Adapter             string               `json:"adapter"`            // "jira"
+	AdapterConfig       map[string]any       `json:"adapter_config,omitempty"`
+	BoardID             string               `json:"board_id,omitempty"` // tracker board ID
+	Repos               map[string]RepoEntry `json:"repos,omitempty"`    // keyed by repo_id
+	PollIntervalSeconds int                  `json:"poll_interval_seconds,omitempty"`
+	WorktreeBaseDir     string               `json:"worktree_base_dir,omitempty"`
+	Claude              ClaudeConfig         `json:"claude,omitempty"`
 }
 
 // RepoEntry is one registered repository.
