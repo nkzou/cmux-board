@@ -86,8 +86,10 @@ func (a *JiraAdapter) TransitionStatus(ctx context.Context, ticketID, expectedFr
 
 	// Step 2: OCC check — if current status differs from expected, abort immediately.
 	// CRITICAL: No further HTTP calls on mismatch (avoids wasted requests).
+	// Return ConflictError (not bare ErrConflict) so the push handler can populate
+	// Result.ServerStatus for snap-back without an extra round-trip (T-031).
 	if !strings.EqualFold(issueStatus.Fields.Status.Name, expectedFromStatus) {
-		return tracker.ErrConflict
+		return tracker.ConflictError{ServerStatus: issueStatus.Fields.Status.Name}
 	}
 
 	// Step 3: GET available transitions and find the one matching toStatus.
