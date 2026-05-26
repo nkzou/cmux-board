@@ -3,6 +3,7 @@ package tracker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -10,6 +11,35 @@ import (
 // status no longer matches expectedFromStatus (OCC mismatch or HTTP 409).
 // UI resolution: snap card back, show toast "status changed remotely — refresh and retry."
 var ErrConflict = errors.New("expected status mismatch")
+
+// ConflictError wraps ErrConflict with the server's current status so callers can
+// snap back to the correct column without an extra fetch.
+type ConflictError struct {
+	ServerStatus string
+}
+
+// Error implements the error interface.
+func (e ConflictError) Error() string {
+	return fmt.Sprintf("%s: server status is %q", ErrConflict, e.ServerStatus)
+}
+
+// Unwrap returns ErrConflict so errors.Is(err, tracker.ErrConflict) continues to work.
+func (e ConflictError) Unwrap() error { return ErrConflict }
+
+// AuthError is implemented by adapter errors that signal authentication failure (401).
+// Adapters return an error satisfying this interface; the sync package uses IsAuthError
+// to classify poll failures for pill-text routing without importing adapter internals.
+type AuthError interface {
+	error
+	IsAuthError() bool
+}
+
+// IsAuthError reports whether err (or any wrapped error) signals a 401 auth failure.
+// Use this instead of type-asserting jira-specific error types in the sync package.
+func IsAuthError(err error) bool {
+	var ae AuthError
+	return errors.As(err, &ae) && ae.IsAuthError()
+}
 
 // ErrInvalidTransition is returned by TransitionStatus when no workflow transition
 // exists from the current status to the target status (HTTP 400 workflow-forbidden
