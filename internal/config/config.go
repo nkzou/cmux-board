@@ -20,6 +20,13 @@ type Config struct {
 	PollIntervalSeconds int                  `json:"poll_interval_seconds,omitempty"`
 	WorktreeBaseDir     string               `json:"worktree_base_dir,omitempty"`
 	Claude              ClaudeConfig         `json:"claude,omitempty"`
+
+	// DryRun, when true, makes the binary read-only against the tracker.
+	// No TransitionStatus calls are issued; the poller continues to read tickets and
+	// boards normally. Card-move attempts return Result{DryRun: true} so the UI can
+	// surface a non-modal toast and snap the card back to its prior column.
+	// Settable via config file or the --dry-run CLI flag (wired in M-008).
+	DryRun bool `json:"dry_run,omitempty"`
 }
 
 // RepoEntry is one registered repository.
