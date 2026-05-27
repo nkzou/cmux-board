@@ -20,6 +20,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePushOK(msg)
 	case PushConflictMsg:
 		return m.handlePushConflict(msg)
+	case pushResultMsg:
+		return m.handlePushResult(msg)
 	case snapshotRefreshMsg:
 		return m.refreshSnapshot()
 	case activationDoneMsg:

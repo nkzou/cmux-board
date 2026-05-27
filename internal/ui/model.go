@@ -9,6 +9,7 @@ import (
 
 	"github.com/kevin-zou/cmux-board/internal/config"
 	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/kevin-zou/cmux-board/internal/tracker"
 )
 
 // Model is the root BubbleTea model for the cmux-board dock UI.
@@ -24,6 +25,7 @@ type Model struct {
 	// Core data (read from store snapshots)
 	cfg         *config.Config
 	store       *state.Store
+	tr          tracker.IssueTracker // may be nil in tests (drag no-ops when nil)
 	snapshot    *state.State
 	snapshotRev uint64
 
@@ -49,6 +51,12 @@ type Model struct {
 	pickerState      *pickerState
 	assignmentEditor *assignmentEditorState
 	repoPicker       *repoPickerState
+
+	// Drag state (T-065)
+	dragging         bool
+	dragTicketID     string
+	dragFromColumn   string // column ID at drag-start; used for snap-back on conflict
+	dragTargetColumn string // column ID of current hover target
 
 	// Status pills
 	trackerPill pillState
