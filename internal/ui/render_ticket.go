@@ -17,7 +17,6 @@ type renderTicketParams struct {
 }
 
 // renderTicket renders a single kanban ticket card.
-// AgentStatus swim-lane sections from OpenKanban are intentionally omitted.
 // TODO(M-006): add [orphan] glyph when claude_orphan:true
 func renderTicket(p renderTicketParams) string {
 	var headerParts []string

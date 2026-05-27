@@ -8,7 +8,7 @@ import "strings"
 //
 // Examples:
 //
-//	Slug("OpenKanban")  → "openkanban"
+//	Slug("MyService")   → "myservice"
 //	Slug("cmux-board")  → "cmux-board"
 //	Slug("My Repo 2!")  → "my-repo-2"
 //	Slug("  leading  ") → "leading"

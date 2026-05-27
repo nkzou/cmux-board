@@ -15,7 +15,7 @@ func makeActState(activations map[string][]ActivationEntry) *State {
 
 func TestFindActivations_Zero(t *testing.T) {
 	s := makeActState(nil)
-	got := FindActivations(s, "PROJ-42", "openkanban")
+	got := FindActivations(s, "PROJ-42", "my-service")
 	if got == nil {
 		t.Error("expected non-nil empty slice, got nil")
 	}
@@ -26,9 +26,9 @@ func TestFindActivations_Zero(t *testing.T) {
 
 func TestFindActivations_One(t *testing.T) {
 	s := makeActState(map[string][]ActivationEntry{
-		"PROJ-42": {{ActivationID: "act-1", RepoID: "openkanban", TicketID: "PROJ-42"}},
+		"PROJ-42": {{ActivationID: "act-1", RepoID: "my-service", TicketID: "PROJ-42"}},
 	})
-	got := FindActivations(s, "PROJ-42", "openkanban")
+	got := FindActivations(s, "PROJ-42", "my-service")
 	if len(got) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(got))
 	}
@@ -40,14 +40,14 @@ func TestFindActivations_One(t *testing.T) {
 func TestFindActivations_Multiple(t *testing.T) {
 	s := makeActState(map[string][]ActivationEntry{
 		"PROJ-42": {
-			{ActivationID: "act-1", RepoID: "openkanban"},
-			{ActivationID: "act-2", RepoID: "openkanban"},
+			{ActivationID: "act-1", RepoID: "my-service"},
+			{ActivationID: "act-2", RepoID: "my-service"},
 			{ActivationID: "act-3", RepoID: "cmux-board"},
 		},
 	})
-	got := FindActivations(s, "PROJ-42", "openkanban")
+	got := FindActivations(s, "PROJ-42", "my-service")
 	if len(got) != 2 {
-		t.Fatalf("expected 2 entries for openkanban, got %d", len(got))
+		t.Fatalf("expected 2 entries for my-service, got %d", len(got))
 	}
 }
 
@@ -66,8 +66,8 @@ func TestFindActivations_RepoFilter(t *testing.T) {
 
 func TestFindActivationByID_Hit(t *testing.T) {
 	s := makeActState(map[string][]ActivationEntry{
-		"PROJ-42": {{ActivationID: "act-1", RepoID: "openkanban"}},
-		"PROJ-99": {{ActivationID: "act-2", RepoID: "openkanban"}},
+		"PROJ-42": {{ActivationID: "act-1", RepoID: "my-service"}},
+		"PROJ-99": {{ActivationID: "act-2", RepoID: "my-service"}},
 	})
 	got, ok := FindActivationByID(s, "act-2")
 	if !ok {

@@ -6,7 +6,7 @@ import "github.com/kevin-zou/cmux-board/internal/tracker"
 // Algorithm: lowercase → replace runs of non-[a-z0-9-] with '-' → trim '-' from ends.
 // Examples:
 //
-//	"OpenKanban"   → "openkanban"
+//	"MyService"    → "myservice"
 //	"cmux-board"   → "cmux-board"
 //	"My Repo 2!"   → "my-repo-2"
 //	"  leading  "  → "leading"

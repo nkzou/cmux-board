@@ -16,7 +16,7 @@ func TestNewWorkspaceWithLayout_HappyPath(t *testing.T) {
 
 	ref, err := NewWorkspaceWithLayout(context.Background(), NewWorkspaceArgs{
 		Name:               "PROJ-42 [abc12345]",
-		CWD:                "/tmp/worktrees/openkanban-PROJ-42-main-abc12345",
+		CWD:                "/tmp/worktrees/my-service-PROJ-42-main-abc12345",
 		AgentAttachCommand: "claude attach 7c5dcf5d",
 		ShellCommand:       "",
 	})

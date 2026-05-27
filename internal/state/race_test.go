@@ -69,7 +69,7 @@ func TestPollVsActivateParallelism(t *testing.T) {
 	}
 
 	// Seed with one ticket; give it a non-nil AssignedRepoIDs to verify preservation.
-	seedRepos := []string{"openkanban"}
+	seedRepos := []string{"my-service"}
 	if err := store.Mutate(func(s *state.State) error {
 		s.Tickets["PROJ-1"] = state.TicketState{
 			Key:             "PROJ-1",
@@ -125,7 +125,7 @@ func TestPollVsActivateParallelism(t *testing.T) {
 					ActivationID: actID,
 					ActIDShort:   actID[:8],
 					TicketID:     "PROJ-1",
-					RepoID:       "openkanban",
+					RepoID:       "my-service",
 					Step:         state.StepStarted,
 				})
 				return nil
