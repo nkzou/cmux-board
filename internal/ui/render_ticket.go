@@ -14,6 +14,9 @@ type renderTicketParams struct {
 	width       int
 	accentColor lipgloss.Color
 	colors      uiColors
+	// spinnerGlyph is the current frame to draw next to the "activating" label
+	// when ticket.IsActivating is true. Empty when no activation is in flight.
+	spinnerGlyph string
 }
 
 // renderTicket renders a single kanban ticket card.
@@ -40,6 +43,20 @@ func renderTicket(p renderTicketParams) string {
 			Background(p.colors.primary).
 			Padding(0, 1)
 		headerParts = append(headerParts, statusStyle.Render(p.ticket.Status))
+	}
+
+	// Activating badge — spinner glyph + label rendered on the right end of the
+	// header. Signals that an Activate goroutine is in flight so the user
+	// doesn't fire a second one.
+	if p.ticket.IsActivating {
+		glyph := p.spinnerGlyph
+		if glyph == "" {
+			glyph = "⠋"
+		}
+		activatingStyle := lipgloss.NewStyle().
+			Foreground(p.colors.warning).
+			Bold(true)
+		headerParts = append(headerParts, activatingStyle.Render(glyph+" activating"))
 	}
 
 	headerLine := strings.Join(headerParts, "  ")

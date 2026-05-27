@@ -30,10 +30,18 @@ type snapshotRefreshMsg struct{}
 type tickPollMsg struct{}
 
 // activationDoneMsg is emitted when the activation goroutine completes (success or error).
+// TicketID is carried so the UI can clear the per-ticket in-flight marker
+// regardless of whether activation produced a journal entry (errors before the
+// first journal write yield an empty ActivationID).
 type activationDoneMsg struct {
+	TicketID     string
 	ActivationID string
 	Err          error
 }
+
+// spinnerTickMsg drives the activating-ticket spinner animation. The handler
+// re-arms itself only while at least one activation is in flight.
+type spinnerTickMsg struct{}
 
 // activationStepMsg is emitted as each side-effect step within an activation completes.
 type activationStepMsg struct {

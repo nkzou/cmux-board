@@ -28,6 +28,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleActivationDone(msg)
 	case activationStepMsg:
 		return m.handleActivationStep(msg)
+	case spinnerTickMsg:
+		return m.handleSpinnerTick(msg)
 	case focusResultMsg:
 		return m.handleFocusResult(msg)
 	case toastExpireMsg:
@@ -123,8 +125,11 @@ func (m Model) handlePushConflict(msg PushConflictMsg) (Model, tea.Cmd) {
 	return m.pushToast("conflict: " + msg.TicketID + " moved to " + msg.ServerStatus + " — snapped back")
 }
 
-// handleActivationDone handles activation completion or error.
+// handleActivationDone handles activation completion or error. The per-ticket
+// in-flight marker is cleared regardless of outcome so a failed activation
+// doesn't leave the ticket permanently locked.
 func (m Model) handleActivationDone(msg activationDoneMsg) (Model, tea.Cmd) {
+	m = m.clearActivating(msg.TicketID)
 	if msg.Err != nil {
 		// TODO(T-058): emit cmux/claude pill update for specific error types.
 		return m.pushToast(userFriendlyError(msg.Err))
