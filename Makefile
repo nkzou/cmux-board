@@ -7,7 +7,7 @@ COVERAGE_FILE := coverage.out
 build:
 	$(GO) build -o $(BINARY) ./cmd/cmux-board
 
-test:
+test: verify-additive
 	$(GO) test -race ./...
 
 test-integration:
@@ -24,4 +24,4 @@ clean:
 	rm -f $(BINARY) $(COVERAGE_FILE) coverage.html
 
 verify-additive:
-	@echo "TODO: implement in M-011 T-084"
+	bash scripts/check_additive_only.sh
