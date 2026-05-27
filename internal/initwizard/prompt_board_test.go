@@ -11,20 +11,27 @@ import (
 	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
-// boardMockAdapter wraps mockAdapter with a custom ListBoards.
+// boardMockAdapter exposes a programmable GetBoard for prompt_board tests.
 type boardMockAdapter struct {
-	boards    []tracker.BoardSummary
-	listErr   error
+	known map[string]tracker.Board // boardID → board
+	err   error                    // when non-nil, GetBoard always returns this error
 }
 
 func (m *boardMockAdapter) WhoAmI(ctx context.Context) (tracker.UserIdentity, error) {
 	return tracker.UserIdentity{}, errors.New("not implemented")
 }
 func (m *boardMockAdapter) ListBoards(ctx context.Context) ([]tracker.BoardSummary, error) {
-	return m.boards, m.listErr
+	return nil, errors.New("PickBoard must not call ListBoards")
 }
 func (m *boardMockAdapter) GetBoard(ctx context.Context, boardID string) (tracker.Board, error) {
-	return tracker.Board{}, errors.New("not implemented")
+	if m.err != nil {
+		return tracker.Board{}, m.err
+	}
+	b, ok := m.known[boardID]
+	if !ok {
+		return tracker.Board{}, errors.New("board not found")
+	}
+	return b, nil
 }
 func (m *boardMockAdapter) ListTickets(ctx context.Context, boardID string, since *time.Time) ([]tracker.Ticket, error) {
 	return nil, errors.New("not implemented")
@@ -36,58 +43,61 @@ func (m *boardMockAdapter) Capabilities() tracker.Capabilities {
 	return tracker.Capabilities{}
 }
 
-func threeBoards() []tracker.BoardSummary {
-	return []tracker.BoardSummary{
-		{ID: "b1", Name: "Alpha"},
-		{ID: "b2", Name: "Beta"},
-		{ID: "b3", Name: "Gamma"},
-	}
+func twoBoards() *boardMockAdapter {
+	return &boardMockAdapter{known: map[string]tracker.Board{
+		"42": {ID: "42", Name: "Alpha"},
+		"99": {ID: "99", Name: "Beta"},
+	}}
 }
 
-func TestPickBoard_InteractiveSingleBoard(t *testing.T) {
-	a := &boardMockAdapter{boards: []tracker.BoardSummary{{ID: "b1", Name: "Alpha"}}}
-	r := strings.NewReader("1\n")
+func TestPickBoard_InteractiveValidID(t *testing.T) {
+	a := twoBoards()
+	r := strings.NewReader("42\n")
 	var w bytes.Buffer
 	board, err := PickBoard(context.Background(), &w, r, a, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if board.ID != "b1" {
-		t.Errorf("expected board ID %q, got %q", "b1", board.ID)
+	if board.ID != "42" || board.Name != "Alpha" {
+		t.Errorf("got %+v, want {ID:42, Name:Alpha}", board)
 	}
 }
 
-func TestPickBoard_InteractivePickSecond(t *testing.T) {
-	a := &boardMockAdapter{boards: threeBoards()}
-	r := strings.NewReader("2\n")
+func TestPickBoard_InteractiveEmptyThenValid(t *testing.T) {
+	a := twoBoards()
+	r := strings.NewReader("\n99\n")
 	var w bytes.Buffer
 	board, err := PickBoard(context.Background(), &w, r, a, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if board.ID != "b2" {
-		t.Errorf("expected board ID %q, got %q", "b2", board.ID)
+	if board.ID != "99" {
+		t.Errorf("expected board 99, got %q", board.ID)
+	}
+	if !strings.Contains(w.String(), "must not be empty") {
+		t.Errorf("expected empty-ID warning in output, got: %q", w.String())
 	}
 }
 
-func TestPickBoard_InteractiveInvalidThenValid(t *testing.T) {
-	a := &boardMockAdapter{boards: threeBoards()}
-	r := strings.NewReader("abc\n1\n")
+func TestPickBoard_InteractiveUnknownThenValid(t *testing.T) {
+	a := twoBoards()
+	r := strings.NewReader("ghost\n42\n")
 	var w bytes.Buffer
 	board, err := PickBoard(context.Background(), &w, r, a, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if board.ID != "b1" {
-		t.Errorf("expected board ID %q, got %q", "b1", board.ID)
+	if board.ID != "42" {
+		t.Errorf("expected board 42, got %q", board.ID)
+	}
+	if !strings.Contains(w.String(), `board "ghost" not found`) {
+		t.Errorf("expected not-found message in output, got: %q", w.String())
 	}
 }
 
-func TestPickBoard_InteractiveExhaustRetries(t *testing.T) {
-	a := &boardMockAdapter{boards: threeBoards()}
-	// Provide maxBoardPickRetries invalid inputs
-	inputs := strings.Repeat("abc\n", maxBoardPickRetries)
-	r := strings.NewReader(inputs)
+func TestPickBoard_ExhaustRetries(t *testing.T) {
+	a := twoBoards()
+	r := strings.NewReader(strings.Repeat("ghost\n", maxBoardPickRetries))
 	var w bytes.Buffer
 	_, err := PickBoard(context.Background(), &w, r, a, "")
 	if err == nil {
@@ -99,41 +109,28 @@ func TestPickBoard_InteractiveExhaustRetries(t *testing.T) {
 }
 
 func TestPickBoard_FlagOverrideValid(t *testing.T) {
-	a := &boardMockAdapter{boards: threeBoards()}
+	a := twoBoards()
 	var w bytes.Buffer
-	board, err := PickBoard(context.Background(), &w, strings.NewReader(""), a, "b2")
+	board, err := PickBoard(context.Background(), &w, strings.NewReader(""), a, "42")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if board.ID != "b2" {
-		t.Errorf("expected board ID %q, got %q", "b2", board.ID)
+	if board.ID != "42" || board.Name != "Alpha" {
+		t.Errorf("got %+v, want {ID:42, Name:Alpha}", board)
 	}
-	// No output in flag-override mode
 	if w.Len() > 0 {
 		t.Errorf("expected no output in flag-override mode, got: %q", w.String())
 	}
 }
 
 func TestPickBoard_FlagOverrideUnknownID(t *testing.T) {
-	a := &boardMockAdapter{boards: threeBoards()}
+	a := twoBoards()
 	var w bytes.Buffer
-	_, err := PickBoard(context.Background(), &w, strings.NewReader(""), a, "unknown-id")
+	_, err := PickBoard(context.Background(), &w, strings.NewReader(""), a, "unknown")
 	if err == nil {
 		t.Fatal("expected error for unknown board ID")
 	}
-	if !strings.Contains(err.Error(), "unknown-id") {
+	if !strings.Contains(err.Error(), `"unknown"`) {
 		t.Errorf("expected board ID in error message, got: %v", err)
-	}
-}
-
-func TestPickBoard_EmptyBoardList(t *testing.T) {
-	a := &boardMockAdapter{boards: nil}
-	var w bytes.Buffer
-	_, err := PickBoard(context.Background(), &w, strings.NewReader(""), a, "")
-	if err == nil {
-		t.Fatal("expected error for empty board list")
-	}
-	if !strings.Contains(err.Error(), "no boards found") {
-		t.Errorf("expected 'no boards found' in error, got: %v", err)
 	}
 }
