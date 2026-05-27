@@ -12,6 +12,11 @@ type Ticket struct {
 	// ticket. Drives the spinner badge in renderTicket and blocks new
 	// activation attempts via tryActivate.
 	IsActivating bool
+	// ActivationCount is the number of non-removed activations (worktrees)
+	// that already exist for this ticket across all repos. When >0 the card
+	// shows a worktree badge and Enter focuses the existing workspace
+	// instead of creating a new one.
+	ActivationCount int
 }
 
 // Column is a temporary placeholder type until the tracker interface is wired in M-008.

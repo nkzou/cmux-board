@@ -41,6 +41,19 @@ func FindActivationByShortID(s *State, actIDShort string) (*ActivationEntry, boo
 	return nil, false
 }
 
+// ActivationCount returns the number of non-removed activations for ticketID,
+// across all repos. Used by the UI to render the worktree-exists badge on
+// each ticket card.
+func ActivationCount(s *State, ticketID string) int {
+	n := 0
+	for _, act := range s.Activations[ticketID] {
+		if act.RemovedAt == nil {
+			n++
+		}
+	}
+	return n
+}
+
 // AllIncompleteActivations returns all entries across all tickets and repos where complete == false.
 // Used by startup reconciliation (T-062a).
 func AllIncompleteActivations(s *State) []ActivationEntry {
