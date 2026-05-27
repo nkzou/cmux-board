@@ -15,7 +15,7 @@ func TestMergePulledTickets_TrackerFieldsOverwritten(t *testing.T) {
 	s.Tickets["PROJ-42"] = state.TicketState{
 		Key:             "PROJ-42",
 		Summary:         "old",
-		AssignedRepoIDs: []string{"openkanban"},
+		AssignedRepoIDs: []string{"my-service"},
 	}
 
 	pulled := []tracker.Ticket{
@@ -27,8 +27,8 @@ func TestMergePulledTickets_TrackerFieldsOverwritten(t *testing.T) {
 	if got.Summary != "new" {
 		t.Errorf("TC-1: Summary: want %q, got %q", "new", got.Summary)
 	}
-	if len(got.AssignedRepoIDs) != 1 || got.AssignedRepoIDs[0] != "openkanban" {
-		t.Errorf("TC-1: AssignedRepoIDs: want [\"openkanban\"], got %v", got.AssignedRepoIDs)
+	if len(got.AssignedRepoIDs) != 1 || got.AssignedRepoIDs[0] != "my-service" {
+		t.Errorf("TC-1: AssignedRepoIDs: want [\"my-service\"], got %v", got.AssignedRepoIDs)
 	}
 }
 
@@ -91,7 +91,7 @@ func TestMergePulledTickets_NewTicketEmptyRepoIDs(t *testing.T) {
 	}
 }
 
-// TC-5: E3 sequence — two consecutive pulls; status advances, local-only fields survive.
+// TC-5: E3 sequence -- two consecutive pulls; status advances, local-only fields survive.
 func TestMergePulledTickets_E3Sequence(t *testing.T) {
 	s := state.DefaultState()
 
@@ -101,7 +101,7 @@ func TestMergePulledTickets_E3Sequence(t *testing.T) {
 	})
 	// Simulate user assigning a repo.
 	ts := s.Tickets["PROJ-42"]
-	ts.AssignedRepoIDs = []string{"openkanban"}
+	ts.AssignedRepoIDs = []string{"my-service"}
 	s.Tickets["PROJ-42"] = ts
 
 	// Second pull: Done.
@@ -113,12 +113,12 @@ func TestMergePulledTickets_E3Sequence(t *testing.T) {
 	if got.LastKnownStatus != "Done" {
 		t.Errorf("TC-5: LastKnownStatus: want %q, got %q", "Done", got.LastKnownStatus)
 	}
-	if len(got.AssignedRepoIDs) != 1 || got.AssignedRepoIDs[0] != "openkanban" {
-		t.Errorf("TC-5: AssignedRepoIDs: want [\"openkanban\"], got %v", got.AssignedRepoIDs)
+	if len(got.AssignedRepoIDs) != 1 || got.AssignedRepoIDs[0] != "my-service" {
+		t.Errorf("TC-5: AssignedRepoIDs: want [\"my-service\"], got %v", got.AssignedRepoIDs)
 	}
 }
 
-// TC-6: race safety — concurrent Mutate calls must not produce data races.
+// TC-6: race safety -- concurrent Mutate calls must not produce data races.
 func TestMergePulledTickets_RaceSafety(t *testing.T) {
 	store, err := state.Open(t.TempDir() + "/state.json")
 	if err != nil {

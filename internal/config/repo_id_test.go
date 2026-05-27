@@ -8,10 +8,10 @@ func TestDeriveRepoID(t *testing.T) {
 		input string
 		want  string
 	}{
-		{name: "lowercase simple", input: "openkanban", want: "openkanban"},
+		{name: "lowercase simple", input: "myservice", want: "myservice"},
 		{name: "already-slug", input: "cmux-board", want: "cmux-board"},
-		{name: "mixed case", input: "OpenKanban", want: "openkanban"},
-		{name: "trailing punct", input: "OpenKanban!", want: "openkanban"},
+		{name: "mixed case", input: "MyService", want: "myservice"},
+		{name: "trailing punct", input: "MyService!", want: "myservice"},
 		{name: "space sep", input: "My Repo", want: "my-repo"},
 		{name: "multi space", input: "My  Repo", want: "my-repo"},
 		{name: "numbers", input: "Repo 2", want: "repo-2"},
@@ -20,8 +20,8 @@ func TestDeriveRepoID(t *testing.T) {
 		{name: "trailing dashes", input: "foo--", want: "foo"},
 		{name: "all special", input: "---", want: ""},
 		{name: "unicode run", input: "héllo", want: "h-llo"},
-		{name: "full FEATURE.md openkanban", input: "openkanban", want: "openkanban"},
-		{name: "full FEATURE.md cmux-board", input: "cmux-board", want: "cmux-board"},
+		{name: "full slug cmux-board", input: "cmux-board", want: "cmux-board"},
+		{name: "mixed case cmux-board", input: "CmuxBoard", want: "cmuxboard"},
 	}
 
 	for _, tt := range tests {

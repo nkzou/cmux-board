@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check_additive_only.sh — six-arm (plus arm 7) negative-grep enforcement.
+# check_additive_only.sh — eight-arm negative-grep enforcement.
 #
 # Exit code: 0 if all arms return zero matches, 1 on first violation.
 # Pass --all to report every failing arm before exiting.
@@ -12,6 +12,7 @@
 #   5. No direct *State field mutation outside store files (F17, Codex Finding 4)
 #   6. HTTP headers never logged (F20, Codex Finding 3)
 #   7. No git-status dirty-worktree check in focus/activate paths (E9)
+#   8. No legacy brand references (openkanban/TechDufus) outside history (M-012 T-090b)
 
 set -euo pipefail
 
@@ -112,6 +113,18 @@ else
   echo "  OK (0 matches)"
 fi
 
+# ── Arm 8: No legacy brand references ───────────────────────────────────────
+# Committed last in M-012 (T-090b), after T-091 + T-092 removed all references.
+# docs/plans/ excluded — historical record. go.sum excluded — go-mod managed.
+echo "Arm 8: legacy brand references (openkanban/TechDufus) outside history..."
+if git grep -nE 'openkanban|OpenKanban|TechDufus|techdufus' \
+     -- ':!docs/plans/' ':!go.sum' ':!scripts/check_additive_only.sh' 2>/dev/null; then
+  echo "FAIL: legacy brand references found. Run T-090 audit + T-091/T-092 cleanup."
+  fail "8 (legacy brand references)"
+else
+  echo "  OK (0 matches)"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 if [ "$FAILURES" -gt 0 ]; then
   echo ""
@@ -120,5 +133,5 @@ if [ "$FAILURES" -gt 0 ]; then
 fi
 
 echo ""
-echo "PASS: all arms clean."
+echo "PASS: all eight arms clean."
 exit 0
