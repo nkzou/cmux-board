@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/kevin-zou/cmux-board/internal/atomicfile"
 )
 
 // openInMemory creates a Store with no backing file (uses a temp file for persistence).
@@ -129,7 +129,7 @@ func TestOpenCorruptJSON(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := dir + "/state.json"
-	if err := config.WriteFileAtomic(path, []byte(`{invalid`), 0644); err != nil {
+	if err := atomicfile.WriteFile(path, []byte(`{invalid`), 0644); err != nil {
 		t.Fatalf("write corrupt: %v", err)
 	}
 	_, err := Open(path)
