@@ -37,6 +37,47 @@ func (e ErrRepoNotRegistered) Error() string {
 	return fmt.Sprintf("repo %q not registered — run cmux-board repos add", e.RepoID)
 }
 
+// ActivationHooks provides injectable kill points for fault-injection testing.
+// In production, all hooks are nil (no-ops). In tests, hooks are set to
+// panic("kill") at the appropriate point to simulate process kills.
+//
+// Use callHook(fn) to invoke any hook — it is nil-safe and incurs no overhead
+// when all hooks are nil (the common production case).
+type ActivationHooks struct {
+	// Hooks called BEFORE each side effect.
+	BeforeInitialJournal func()
+	BeforeWorktree       func()
+	BeforeClaude         func()
+	BeforeCmux           func()
+
+	// Hooks called AFTER the side effect's external call returns,
+	// BEFORE the next store.Mutate.
+	AfterWorktreeBeforeJournal func()
+	AfterClaudeBeforeJournal   func()
+	AfterCmuxBeforeJournal     func()
+
+	// Hooks called AFTER each store.Mutate completes.
+	AfterWorktreeJournal func()
+	AfterClaudeJournal   func()
+	AfterCmuxJournal     func()
+}
+
+// callHook calls fn if non-nil. Zero-overhead in production (nil check is inlined).
+func callHook(fn func()) {
+	if fn != nil {
+		fn()
+	}
+}
+
+// hook returns the function field f from h if h is non-nil, otherwise nil.
+// Usage: callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.BeforeWorktree }))
+func hook(h *ActivationHooks, field func(*ActivationHooks) func()) func() {
+	if h == nil {
+		return nil
+	}
+	return field(h)
+}
+
 // activateDeps groups injectable side-effect functions.
 // In production, all fields are nil and the real package-level functions are used.
 // In tests, fields are set to mocks.
@@ -45,6 +86,7 @@ type activateDeps struct {
 	launchBackground func(ctx context.Context, args claudecli.BGArgs) (claudecli.BGResult, error)
 	newWorkspace     func(ctx context.Context, args cmuxcli.NewWorkspaceArgs) (string, error)
 	listPanes        func(ctx context.Context, wsRef string) ([]cmuxcli.Pane, error)
+	hooks            *ActivationHooks
 }
 
 func (d activateDeps) withDefaults() activateDeps {
@@ -158,6 +200,7 @@ func activate(
 	}
 
 	// 4. Journal entry BEFORE any side effect.
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.BeforeInitialJournal }))
 	now := time.Now()
 	initialEntry := state.ActivationEntry{
 		ActivationID: actID.String(),
@@ -186,9 +229,11 @@ func activate(
 	// 5. Side effect 1: create git worktree.
 	// Strip trailing slash before passing to CreateWorktreeAt.
 	worktreeDir := strings.TrimSuffix(finalPath, "/")
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.BeforeWorktree }))
 	if err := deps.createWorktree(repo.Path, worktreeDir, branchName, repo.DefaultBranch); err != nil {
 		return state.ActivationEntry{}, fmt.Errorf("failed to create worktree: %w", err)
 	}
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.AfterWorktreeBeforeJournal }))
 	if err := store.Mutate(func(s *state.State) error {
 		act := findActivationMutable(s, actID.String())
 		if act == nil {
@@ -201,9 +246,11 @@ func activate(
 	}); err != nil {
 		return state.ActivationEntry{}, fmt.Errorf("failed to journal worktree_created: %w", err)
 	}
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.AfterWorktreeJournal }))
 
 	// 6. Side effect 2: launch claude --bg.
 	// Uses cmd.Dir = worktreeDir (NEVER --cwd; see CONVENTIONS Immutable Constraints).
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.BeforeClaude }))
 	bgResult, err := deps.launchBackground(ctx, claudecli.BGArgs{
 		Worktree:       worktreeDir,
 		Name:           claudeName,
@@ -214,6 +261,7 @@ func activate(
 	if err != nil {
 		return state.ActivationEntry{}, fmt.Errorf("failed to launch claude: %w", err)
 	}
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.AfterClaudeBeforeJournal }))
 	if err := store.Mutate(func(s *state.State) error {
 		act := findActivationMutable(s, actID.String())
 		if act == nil {
@@ -225,8 +273,10 @@ func activate(
 	}); err != nil {
 		return state.ActivationEntry{}, fmt.Errorf("failed to journal claude_started: %w", err)
 	}
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.AfterClaudeJournal }))
 
 	// 7. Side effect 3: create cmux workspace.
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.BeforeCmux }))
 	agentCmd := "claude attach " + bgResult.ShortID
 	wsRef, err := deps.newWorkspace(ctx, cmuxcli.NewWorkspaceArgs{
 		Name:               cmuxName,
@@ -244,6 +294,7 @@ func activate(
 	if err != nil {
 		return state.ActivationEntry{}, fmt.Errorf("failed to resolve agent pane ref: %w", err)
 	}
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.AfterCmuxBeforeJournal }))
 
 	now2 := time.Now()
 	if err := store.Mutate(func(s *state.State) error {
@@ -260,6 +311,7 @@ func activate(
 	}); err != nil {
 		return state.ActivationEntry{}, fmt.Errorf("failed to journal cmux_created: %w", err)
 	}
+	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.AfterCmuxJournal }))
 
 	// Return the final committed entry from a fresh snapshot.
 	finalSnap, _ := store.Snapshot()
