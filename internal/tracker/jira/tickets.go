@@ -53,6 +53,10 @@ const listTicketsWindow = 3 * 30 * 24 * time.Hour // ~3 calendar months
 // ListTickets fetches all tickets for a board using JQL.
 // Calls 'acli jira workitem search --json --paginate --jql "..."'.
 //
+// JQL always includes 'assignee = currentUser()' so the board only shows
+// tickets owned by the authenticated user — cmux-board is a personal worktree
+// dashboard, not a team-wide view.
+//
 // JQL always includes 'updated >= <cutoff>' where cutoff is the more recent of
 // (since) and (now - 3 months). The 3-month floor keeps the result set bounded
 // against long-lived projects with thousands of historical tickets.
@@ -74,7 +78,7 @@ func (a *JiraAdapter) ListTickets(ctx context.Context, boardID string, since *ti
 	if since != nil && since.After(cutoff) {
 		cutoff = *since
 	}
-	jql := fmt.Sprintf("project = %s AND updated >= %q ORDER BY updated DESC",
+	jql := fmt.Sprintf("project = %s AND assignee = currentUser() AND updated >= %q ORDER BY updated DESC",
 		projectKey, cutoff.UTC().Format("2006-01-02 15:04"))
 
 	stdout, stderr, exitCode, err := a.runner(ctx,
