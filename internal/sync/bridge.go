@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 const bridgeBufSize = 16

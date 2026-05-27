@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // makeTestModelWithBoard constructs a Model with a board having the given number of

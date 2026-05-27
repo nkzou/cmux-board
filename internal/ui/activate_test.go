@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/claudecli"
-	"github.com/kevin-zou/cmux-board/internal/cmuxcli"
-	"github.com/kevin-zou/cmux-board/internal/config"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/claudecli"
+	"github.com/nkzou/cmux-board/internal/cmuxcli"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // buildTestConfig builds a minimal *config.Config for activate tests.

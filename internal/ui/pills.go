@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/kevin-zou/cmux-board/internal/cmuxcli"
+	"github.com/nkzou/cmux-board/internal/cmuxcli"
 )
 
 // Pill key constants. Values MUST match cmuxcli.PillKey* exactly.

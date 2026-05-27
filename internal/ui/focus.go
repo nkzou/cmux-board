@@ -8,9 +8,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/kevin-zou/cmux-board/internal/claudecli"
-	"github.com/kevin-zou/cmux-board/internal/cmuxcli"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/claudecli"
+	"github.com/nkzou/cmux-board/internal/cmuxcli"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // FocusResult is the outcome of a Focus call.

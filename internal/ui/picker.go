@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // newPickerState returns an initialized pickerState for (ticketID, repoID).

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/atomicfile"
+	"github.com/nkzou/cmux-board/internal/atomicfile"
 )
 
 // openInMemory creates a Store with no backing file (uses a temp file for persistence).

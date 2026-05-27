@@ -5,7 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // ticketsMap builds a map[string]*state.TicketState from key/summary pairs.

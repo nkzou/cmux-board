@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 func TestReposListCmd_EmptyRepos(t *testing.T) {

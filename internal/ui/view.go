@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // View implements tea.Model. Composes all render helpers into the final TUI string.

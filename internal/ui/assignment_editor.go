@@ -7,8 +7,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // newAssignmentEditorState returns an initialized assignmentEditorState.

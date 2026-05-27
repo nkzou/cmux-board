@@ -1,6 +1,6 @@
 # cmux-board
 
-**Module:** `github.com/kevin-zou/cmux-board`
+**Module:** `github.com/nkzou/cmux-board`
 
 TUI kanban board that syncs with Jira Cloud and spawns Claude Code agents per ticket.
 Go 1.25+, BubbleTea, Lipgloss. Runs inside a cmux Dock sidebar.

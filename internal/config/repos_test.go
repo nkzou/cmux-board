@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 func makeConfig(repos map[string]RepoEntry) *Config {

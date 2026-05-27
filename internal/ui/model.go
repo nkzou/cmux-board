@@ -7,9 +7,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
-	"github.com/kevin-zou/cmux-board/internal/state"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // Model is the root BubbleTea model for the cmux-board dock UI.

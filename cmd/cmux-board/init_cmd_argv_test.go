@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/initwizard"
+	"github.com/nkzou/cmux-board/internal/initwizard"
 )
 
 func TestInitCmd_NoAPITokenFlag(t *testing.T) {

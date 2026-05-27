@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/secretsink"
+	"github.com/nkzou/cmux-board/internal/secretsink"
 )
 
 func TestConfigLoadSaveRoundTrip(t *testing.T) {

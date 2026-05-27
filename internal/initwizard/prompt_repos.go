@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/config"
 )
 
 // repoIDPattern matches valid repo IDs: starts with alphanumeric, rest alphanumeric or dash.

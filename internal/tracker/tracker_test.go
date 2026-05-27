@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // stubAdapter is a compile-time check that the IssueTracker interface can be satisfied.

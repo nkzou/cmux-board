@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/kevin-zou/cmux-board/internal/atomicfile"
+	"github.com/nkzou/cmux-board/internal/atomicfile"
 )
 
 // Store serializes all state.json mutations through a single mutex.

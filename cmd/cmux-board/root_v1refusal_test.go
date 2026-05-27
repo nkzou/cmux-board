@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/config"
 )
 
 // setConfigDirEnv sets CMUX_BOARD_CONFIG_DIR for the duration of the test.

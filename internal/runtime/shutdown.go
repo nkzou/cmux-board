@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	isync "github.com/kevin-zou/cmux-board/internal/sync"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	isync "github.com/nkzou/cmux-board/internal/sync"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // SHUTDOWN INVARIANT: cmux-board NEVER calls any of the following on shutdown:

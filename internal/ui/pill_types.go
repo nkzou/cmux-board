@@ -3,7 +3,7 @@ package ui
 import (
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // pillState tracks the last-emitted text and timestamp for debounce logic.
