@@ -97,8 +97,12 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Focus()
 	case KeyAssignRepos:
-		// TODO(T-061): initialize assignmentEditor from current ticket + cfg.Repos.
-		m.assignmentEditor = &assignmentEditorState{}
+		colTickets := m.ticketsForActiveCol()
+		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+			return m, nil
+		}
+		ticketID := colTickets[m.activeTicketIdx].Key
+		m.assignmentEditor = newAssignmentEditorState(m.cfg, m.snapshot, ticketID)
 		m.mode = ModeAssignmentEditor
 	case KeyFilter:
 		// TODO(T-066): focus filter input.
@@ -201,11 +205,50 @@ func (m Model) handleApproachNameMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 }
 
-// handleAssignmentEditorMode is a stub. Full implementation in T-061.
+// handleAssignmentEditorMode handles key events in ModeAssignmentEditor.
 func (m Model) handleAssignmentEditorMode(msg tea.KeyMsg) (Model, tea.Cmd) {
-	if msg.String() == KeyAssignCancel {
+	if m.assignmentEditor == nil {
+		m.mode = ModeNormal
+		return m, nil
+	}
+	ed := m.assignmentEditor
+	switch msg.String() {
+	case KeyAssignToggle:
+		if len(ed.repoIDs) == 0 {
+			return m, nil
+		}
+		id := ed.repoIDs[ed.cursorIdx]
+		m.assignmentEditor.checked[id] = !m.assignmentEditor.checked[id]
+	case KeyAssignCommit:
+		// Build newAssigned: all repoIDs where checked == true, in repoIDs order.
+		newAssigned := make([]string, 0, len(ed.repoIDs))
+		for _, id := range ed.repoIDs {
+			if ed.checked[id] {
+				newAssigned = append(newAssigned, id)
+			}
+		}
+		ticketID := ed.ticketID
+		if err := m.store.Mutate(func(s *state.State) error {
+			return state.ApplyAssignments(s, ticketID, newAssigned)
+		}); err != nil {
+			return m.pushToast("assignment failed: " + err.Error())
+		}
+		snap, rev := m.store.Snapshot()
+		m.snapshot = snap
+		m.snapshotRev = rev
 		m.assignmentEditor = nil
 		m.mode = ModeNormal
+	case KeyAssignCancel:
+		m.assignmentEditor = nil
+		m.mode = ModeNormal
+	case KeyDown, "down":
+		if ed.cursorIdx < len(ed.repoIDs)-1 {
+			m.assignmentEditor.cursorIdx++
+		}
+	case KeyUp, "up":
+		if ed.cursorIdx > 0 {
+			m.assignmentEditor.cursorIdx--
+		}
 	}
 	return m, nil
 }
