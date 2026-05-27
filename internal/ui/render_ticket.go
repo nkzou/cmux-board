@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -43,6 +44,21 @@ func renderTicket(p renderTicketParams) string {
 			Background(p.colors.primary).
 			Padding(0, 1)
 		headerParts = append(headerParts, statusStyle.Render(p.ticket.Status))
+	}
+
+	// Worktree badge — present when this ticket already has at least one
+	// activation. Tells the user a press-Enter will switch to the existing
+	// claude/worktree workspace instead of creating a new one. ⎇ is the
+	// Unicode "alternative key" glyph commonly used for branch indicators.
+	if p.ticket.ActivationCount > 0 {
+		label := "⎇"
+		if p.ticket.ActivationCount > 1 {
+			label = fmt.Sprintf("⎇%d", p.ticket.ActivationCount)
+		}
+		worktreeStyle := lipgloss.NewStyle().
+			Foreground(p.colors.success).
+			Bold(true)
+		headerParts = append(headerParts, worktreeStyle.Render(label))
 	}
 
 	// Activating badge — spinner glyph + label rendered on the right end of the
