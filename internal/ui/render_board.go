@@ -27,13 +27,18 @@ type renderBoardParams struct {
 	spinnerGlyph   string
 }
 
+// boardWidthFraction is the share of the available terminal width that the
+// kanban columns collectively occupy. The remaining ~25% is left as
+// breathing room so the board doesn't bleed to the right edge of the dock.
+const boardWidthFraction = 0.75
+
 // renderBoard renders the kanban board given the provided parameters.
 // It handles scroll indicators, column rendering, and active/hover states.
 //
-// All configured columns are sized to fit within p.width. Columns share the
-// available width evenly and shrink as needed — the previous behaviour clipped
-// columns past width/22 behind ◀ ▶ indicators, which hid most of the board on
-// the narrow Dock sidebar.
+// All configured columns are sized to fit within boardWidthFraction*p.width.
+// Columns share that budget evenly and shrink as needed — the previous
+// behaviour clipped columns past width/22 behind ◀ ▶ indicators, which hid
+// most of the board on the narrow Dock sidebar.
 func renderBoard(p renderBoardParams) string {
 	if len(p.columns) == 0 {
 		return lipgloss.NewStyle().
@@ -45,9 +50,14 @@ func renderBoard(p renderBoardParams) string {
 	endCol := len(p.columns)
 	numVisible := endCol - startCol
 
-	// Account for the 1-cell right margin between adjacent columns. The last
-	// column has no margin, so total margin overhead is (numVisible-1).
-	available := p.width - (numVisible - 1)
+	// Target ~75% of the terminal width for the board, leaving the remainder
+	// as right-side margin. Account for the 1-cell right margin between
+	// adjacent columns (last column has none, so overhead is numVisible-1).
+	budget := int(float64(p.width) * boardWidthFraction)
+	if budget > p.width {
+		budget = p.width
+	}
+	available := budget - (numVisible - 1)
 	if available < numVisible {
 		available = numVisible // at least 1 cell per column
 	}
