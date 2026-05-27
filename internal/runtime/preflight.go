@@ -120,8 +120,11 @@ func checkCmux(ctx context.Context) (*cmuxResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cmux pre-flight failed: %w.\nIs cmux running? Check with: cmux --json identify", err)
 	}
+	// Also fetch cmux binary version for the RT-1 drift-detection log line.
+	// A version fetch failure is non-fatal; we log an empty string if it fails.
+	ver, _ := cmuxcli.Version(ctx)
 	return &cmuxResult{
-		version:   res.Caller.WorkspaceRef, // workspace_ref as proxy; actual version from runner
+		version:   ver,
 		callerRef: res.Caller.WindowRef,
 	}, nil
 }

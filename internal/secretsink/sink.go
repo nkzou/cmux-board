@@ -14,13 +14,36 @@ var (
 
 // Register adds a raw secret value to the redaction set.
 // Only the raw API token should be registered (NOT email, NOT base64 Basic value).
+// Register is idempotent: duplicate values are skipped.
 func Register(value string) {
 	if value == "" {
 		return
 	}
+	b := []byte(value)
 	mu.Lock()
 	defer mu.Unlock()
-	secrets = append(secrets, []byte(value))
+	for _, s := range secrets {
+		if string(s) == value {
+			return // already registered
+		}
+	}
+	secrets = append(secrets, b)
+}
+
+// IsRegistered reports whether value is in the redaction set.
+// Used in tests to verify ordering: secretsink.Register before NewLogger.
+func IsRegistered(value string) bool {
+	if value == "" {
+		return false
+	}
+	mu.RLock()
+	defer mu.RUnlock()
+	for _, s := range secrets {
+		if string(s) == value {
+			return true
+		}
+	}
+	return false
 }
 
 // RedactBytes scans b for any registered secret and replaces each occurrence
