@@ -83,23 +83,74 @@ func TestListTicketsSinceFilter(t *testing.T) {
 	})
 	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
 
-	since := time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
+	// since is within the 3-month window, so it should be the binding cutoff.
+	since := time.Now().Add(-24 * time.Hour)
 	_, err := a.ListTickets(context.Background(), "1", &since)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// The second call (workitem search) should have a --jql arg containing 'updated'.
 	if len(allArgs) < 2 {
 		t.Fatalf("expected 2 calls, got %d", len(allArgs))
 	}
-	jqlArgs := allArgs[1]
-	jqlStr := strings.Join(jqlArgs, " ")
+	jqlStr := strings.Join(allArgs[1], " ")
 	if !strings.Contains(jqlStr, "updated") {
-		t.Errorf("workitem search args missing 'updated' in JQL: %v", jqlArgs)
+		t.Errorf("workitem search args missing 'updated' in JQL: %v", allArgs[1])
 	}
-	if !strings.Contains(jqlStr, "2026-05-26") {
-		t.Errorf("workitem search args missing date: %v", jqlArgs)
+	wantDate := since.UTC().Format("2006-01-02 15:04")
+	if !strings.Contains(jqlStr, wantDate) {
+		t.Errorf("workitem search args missing since date %q: %v", wantDate, allArgs[1])
+	}
+}
+
+func TestListTicketsThreeMonthFloorWhenSinceNil(t *testing.T) {
+	var allArgs [][]string
+	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
+		{stdout: []byte(boardSearchForProject), exitCode: 0},
+		{stdout: []byte(`[]`), exitCode: 0},
+	})
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
+
+	_, err := a.ListTickets(context.Background(), "1", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	jqlStr := strings.Join(allArgs[1], " ")
+	if !strings.Contains(jqlStr, "updated >=") {
+		t.Errorf("expected 'updated >=' in JQL when since is nil, got: %v", allArgs[1])
+	}
+	// Floor date should be ~3 months ago. Check the year matches roughly.
+	floor := time.Now().Add(-listTicketsWindow).UTC().Format("2006-01-02")
+	if !strings.Contains(jqlStr, floor) {
+		t.Errorf("expected 3-month floor date %q in JQL, got: %v", floor, allArgs[1])
+	}
+}
+
+func TestListTicketsThreeMonthFloorOverridesOldSince(t *testing.T) {
+	var allArgs [][]string
+	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
+		{stdout: []byte(boardSearchForProject), exitCode: 0},
+		{stdout: []byte(`[]`), exitCode: 0},
+	})
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
+
+	// since is older than 3 months — floor should win.
+	since := time.Now().Add(-180 * 24 * time.Hour)
+	_, err := a.ListTickets(context.Background(), "1", &since)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	jqlStr := strings.Join(allArgs[1], " ")
+	oldSinceDate := since.UTC().Format("2006-01-02")
+	if strings.Contains(jqlStr, oldSinceDate) {
+		t.Errorf("expected old since date %q NOT to appear (floor should win): %v",
+			oldSinceDate, allArgs[1])
+	}
+	floor := time.Now().Add(-listTicketsWindow).UTC().Format("2006-01-02")
+	if !strings.Contains(jqlStr, floor) {
+		t.Errorf("expected floor date %q in JQL: %v", floor, allArgs[1])
 	}
 }
 
