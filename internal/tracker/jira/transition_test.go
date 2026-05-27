@@ -41,14 +41,14 @@ func jsonOK(body string) func(http.ResponseWriter, *http.Request) {
 }
 
 func statusResponse(status string) func(http.ResponseWriter, *http.Request) {
-	return jsonOK(`{"fields":{"status":{"name":"` + status + `"}}}`)
+	return jsonOK(`{"id":"PROJ-1","key":"PROJ-1","fields":{"status":{"name":"` + status + `"}}}`)
 }
 
 func transitionsJSON(transitions string) func(http.ResponseWriter, *http.Request) {
 	return jsonOK(`{"transitions":[` + transitions + `]}`)
 }
 
-func statusCode(code int) func(http.ResponseWriter, *http.Request) {
+func statusCodeHandler(code int) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(code)
 	}
@@ -62,17 +62,12 @@ func statusCodeWithBody(code int, body string) func(http.ResponseWriter, *http.R
 	}
 }
 
-func newAdapterWithHandler(t *testing.T, h http.Handler) (*JiraAdapter, *sequentialHandler) {
+func newAdapterWithSeqHandler(t *testing.T, h *sequentialHandler) (*JiraAdapter, *sequentialHandler) {
 	t.Helper()
-	seq, ok := h.(*sequentialHandler)
-	if !ok {
-		panic("expected *sequentialHandler")
-	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	return newJiraAdapterWithClient(c), seq
+	return newTestAdapter(t, srv, creds), h
 }
 
 func TestTransitionStatusHappyPath(t *testing.T) {
@@ -93,7 +88,7 @@ func TestTransitionStatusHappyPath(t *testing.T) {
 			},
 		},
 	}
-	adapter, seq := newAdapterWithHandler(t, h)
+	adapter, seq := newAdapterWithSeqHandler(t, h)
 
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "In Progress")
 	if err != nil {
@@ -111,7 +106,7 @@ func TestTransitionStatusOCCMismatch_Step2(t *testing.T) {
 			statusResponse("In Progress"),
 		},
 	}
-	adapter, seq := newAdapterWithHandler(t, h)
+	adapter, seq := newAdapterWithSeqHandler(t, h)
 
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "Done")
 	if err == nil {
@@ -138,7 +133,7 @@ func TestTransitionStatusNoMatchingTransition(t *testing.T) {
 			),
 		},
 	}
-	adapter, seq := newAdapterWithHandler(t, h)
+	adapter, seq := newAdapterWithSeqHandler(t, h)
 
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "In Progress")
 	if err == nil {
@@ -158,10 +153,10 @@ func TestTransitionStatusPOST409(t *testing.T) {
 		responses: []func(http.ResponseWriter, *http.Request){
 			statusResponse("To Do"),
 			transitionsJSON(`{"id":"31","name":"Start","to":{"name":"In Progress"}}`),
-			statusCode(http.StatusConflict), // POST → 409
+			statusCodeHandler(http.StatusConflict), // POST → 409
 		},
 	}
-	adapter, _ := newAdapterWithHandler(t, h)
+	adapter, _ := newAdapterWithSeqHandler(t, h)
 
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "In Progress")
 	if err == nil {
@@ -180,7 +175,7 @@ func TestTransitionStatusPOST400WorkflowForbidden(t *testing.T) {
 			statusCodeWithBody(http.StatusBadRequest, "It is not possible to perform this transition"),
 		},
 	}
-	adapter, _ := newAdapterWithHandler(t, h)
+	adapter, _ := newAdapterWithSeqHandler(t, h)
 
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "In Progress")
 	if err == nil {
@@ -199,7 +194,7 @@ func TestTransitionStatusPOST400OtherBody(t *testing.T) {
 			statusCodeWithBody(http.StatusBadRequest, "customfield_10000 is required"),
 		},
 	}
-	adapter, _ := newAdapterWithHandler(t, h)
+	adapter, _ := newAdapterWithSeqHandler(t, h)
 
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "In Progress")
 	if err == nil {
@@ -219,10 +214,10 @@ func TestTransitionStatusPOST5xx(t *testing.T) {
 		responses: []func(http.ResponseWriter, *http.Request){
 			statusResponse("To Do"),
 			transitionsJSON(`{"id":"31","name":"Start","to":{"name":"In Progress"}}`),
-			statusCode(http.StatusInternalServerError),
+			statusCodeHandler(http.StatusInternalServerError),
 		},
 	}
-	adapter, _ := newAdapterWithHandler(t, h)
+	adapter, _ := newAdapterWithSeqHandler(t, h)
 
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "In Progress")
 	if err == nil {
@@ -240,10 +235,10 @@ func TestTransitionStatusCaseInsensitiveMatch(t *testing.T) {
 			statusResponse("To Do"),
 			// Transition uses all-lowercase target name.
 			transitionsJSON(`{"id":"31","name":"start","to":{"name":"in progress"}}`),
-			statusCode(http.StatusNoContent), // POST → 204
+			statusCodeHandler(http.StatusNoContent), // POST → 204
 		},
 	}
-	adapter, _ := newAdapterWithHandler(t, h)
+	adapter, _ := newAdapterWithSeqHandler(t, h)
 
 	// toStatus uses mixed case — should match case-insensitively.
 	err := adapter.TransitionStatus(context.Background(), "PROJ-1", "To Do", "In Progress")

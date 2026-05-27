@@ -28,8 +28,7 @@ func TestGetBoardHappyPath(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	board, err := adapter.GetBoard(context.Background(), "42")
 	if err != nil {
@@ -82,8 +81,7 @@ func TestGetBoardNoStatuses(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	board, err := adapter.GetBoard(context.Background(), "1")
 	if err != nil {
@@ -116,8 +114,7 @@ func TestGetBoardSlugCollision(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	board, err := adapter.GetBoard(context.Background(), "1")
 	if err != nil {
@@ -136,8 +133,7 @@ func TestGetBoard401(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "bad"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	_, err := adapter.GetBoard(context.Background(), "1")
 	if err == nil {
@@ -156,8 +152,7 @@ func TestGetBoard404(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	_, err := adapter.GetBoard(context.Background(), "999")
 	if err == nil {
