@@ -1,5 +1,6 @@
 # Binary
-openkanban
+cmux-board
+!cmux-board/
 
 # IDE
 .idea/
@@ -15,4 +16,3 @@ Thumbs.db
 # Test/coverage
 coverage.out
 *.test
-
