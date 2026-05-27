@@ -26,7 +26,10 @@ type WizardInput struct {
 	DefaultApproach string
 	Repos           []config.RepoEntry
 	// UserID is the resolved Jira user ID from WhoAmI (stored in adapter_config).
-	UserID string
+	UserID  string
+	// Columns is the manually-configured board column layout from ConfigureColumns.
+	// Stored in adapter_config.columns in config.json.
+	Columns []config.ColumnConfig
 }
 
 // Finalize prints a summary, prompts for confirmation, writes all three files,
@@ -148,6 +151,10 @@ func buildConfig(input WizardInput) config.Config {
 	cfg.Claude = config.ClaudeConfig{}
 	if input.DefaultApproach != "" {
 		cfg.AdapterConfig["default_approach_name"] = input.DefaultApproach
+	}
+	// Persist manually-configured columns into adapter_config.columns.
+	if len(input.Columns) > 0 {
+		cfg.AdapterConfig = config.SetAdapterColumns(cfg.AdapterConfig, input.Columns)
 	}
 	// Populate repos map.
 	if len(input.Repos) > 0 {
