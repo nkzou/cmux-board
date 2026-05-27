@@ -15,20 +15,21 @@ import (
 const toastTTL = 3 * time.Second
 
 // pushToast appends a toast entry to the queue and arms the expiry tick if the
-// queue was previously empty. Returns the tea.Cmd for the tick (or nil on re-push
-// when the queue was already non-empty and the tick is already armed).
-func (m *Model) pushToast(msg string) tea.Cmd {
+// queue was previously empty. Returns the updated Model and the tick tea.Cmd
+// (or nil when the queue was already non-empty and the tick is already armed).
+// BubbleTea convention: value receiver; caller must use the returned Model.
+func (m Model) pushToast(msg string) (Model, tea.Cmd) {
 	wasEmpty := len(m.toasts) == 0
 	m.toasts = append(m.toasts, toastEntry{
 		msg:       msg,
 		expiresAt: time.Now().Add(toastTTL),
 	})
 	if wasEmpty {
-		return tea.Tick(toastTTL, func(_ time.Time) tea.Msg {
+		return m, tea.Tick(toastTTL, func(_ time.Time) tea.Msg {
 			return toastExpireMsg{}
 		})
 	}
-	return nil
+	return m, nil
 }
 
 // expireToastsImpl removes expired toasts and re-arms the tick for the next live entry.
