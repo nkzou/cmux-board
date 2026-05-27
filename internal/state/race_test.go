@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
-	isync "github.com/kevin-zou/cmux-board/internal/sync"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/state"
+	isync "github.com/nkzou/cmux-board/internal/sync"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // TestConcurrentMutateAdd50 spawns 50 goroutines that each add a distinct ticket.

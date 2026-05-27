@@ -1,6 +1,6 @@
 package config
 
-import "github.com/kevin-zou/cmux-board/internal/tracker"
+import "github.com/nkzou/cmux-board/internal/tracker"
 
 // DeriveRepoID computes the default repo_id from a display name.
 // Algorithm: lowercase → replace runs of non-[a-z0-9-] with '-' → trim '-' from ends.

@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	model "github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 const listBoardsPageSize = 50

@@ -1,13 +1,19 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/initwizard"
+	"github.com/nkzou/cmux-board/internal/tracker/jira"
 )
 
 var initCmd = &cobra.Command{
@@ -32,6 +38,7 @@ func init() {
 	// Additional per-field flags for non-interactive mode.
 	initCmd.Flags().String("adapter", "", "adapter name (e.g. jira)")
 	initCmd.Flags().String("site", "", "Jira site URL (e.g. yourorg.atlassian.net)")
+	initCmd.Flags().String("email", "", "Atlassian account email (used for Basic auth)")
 	initCmd.Flags().String("board-id", "", "board ID to select without prompting")
 	initCmd.Flags().StringSlice("repo", nil, "repo paths to register non-interactively (comma-separated or repeated)")
 	initCmd.Flags().Bool("non-interactive", false, "run wizard without any prompts (all values from flags)")
@@ -117,12 +124,8 @@ func resetConfigFiles(configDir string) error {
 }
 
 // runInitWizard runs the interactive (or non-interactive) init wizard.
-// This is a thin shim — the real logic is in internal/initwizard.
-// In non-interactive or flag-override mode, appropriate flags are read here and
-// passed as hints to each wizard step.
+// Test harness (T-075) overrides via wizardFunc.
 func runInitWizard(cmd *cobra.Command, configDir string) error {
-	// For now, emit a placeholder until the full wizard wiring lands in T-077.
-	// The test harness in T-075 mocks this via wizardFunc.
 	return wizardFunc(cmd, configDir)
 }
 
@@ -131,6 +134,98 @@ func runInitWizard(cmd *cobra.Command, configDir string) error {
 var wizardFunc = defaultWizardFunc
 
 func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
-	fmt.Println("cmux-board init wizard — full implementation wired in T-077/T-078")
-	return nil
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	stdout := cmd.OutOrStdout()
+	stdin := cmd.InOrStdin()
+
+	siteFlag, _ := cmd.Flags().GetString("site")
+	emailFlag, _ := cmd.Flags().GetString("email")
+	boardIDFlag, _ := cmd.Flags().GetString("board-id")
+	repoFlag, _ := cmd.Flags().GetStringSlice("repo")
+	tokenFromStdin, _ := cmd.Flags().GetBool("api-token-stdin")
+
+	// 1. Adapter pick (v1 always picks jira; flag is accepted but the menu still shows
+	// the single option for clarity).
+	if _, err := initwizard.PromptAdapterPick(stdin, stdout); err != nil {
+		return fmt.Errorf("adapter pick: %w", err)
+	}
+
+	// 2. Credentials (site + token).
+	creds, err := initwizard.PromptJiraCredentials(stdin, stdout, siteFlag, tokenFromStdin)
+	if err != nil {
+		return fmt.Errorf("credentials: %w", err)
+	}
+
+	// 3. Email (Basic-auth requires email; collected separately from token since email
+	// is not a secret and not registered with secretsink).
+	email, err := promptEmail(stdin, stdout, emailFlag)
+	if err != nil {
+		return fmt.Errorf("email: %w", err)
+	}
+
+	// 4. Build the jira adapter from collected credentials.
+	adapter := jira.NewJiraAdapter(jira.Credentials{
+		Site:     creds.Site,
+		Email:    email,
+		APIToken: creds.APIToken,
+	})
+
+	// 5. Auth probe (WhoAmI) — fails fast on a bad token.
+	identity, err := initwizard.ProbeAuth(ctx, stdout, adapter)
+	if err != nil {
+		return err
+	}
+
+	// 6. Board pick (interactive or --board-id override).
+	board, err := initwizard.PickBoard(ctx, stdout, stdin, adapter, boardIDFlag)
+	if err != nil {
+		return fmt.Errorf("board pick: %w", err)
+	}
+
+	// 7. Repo registration (interactive loop or --repo override).
+	repos, err := initwizard.RegisterRepos(ctx, stdout, stdin, repoFlag, nil, nil)
+	if err != nil {
+		return fmt.Errorf("repos: %w", err)
+	}
+
+	// 8. Finalize: confirmation prompt, write three files atomically, print Dock snippet.
+	input := initwizard.WizardInput{
+		Adapter:         "jira",
+		Site:            creds.Site,
+		Email:           email,
+		APIToken:        creds.APIToken,
+		BoardID:         board.ID,
+		BoardName:       board.Name,
+		WorktreeBaseDir: filepath.Join(configDir, "worktrees"),
+		DefaultApproach: "main",
+		Repos:           repos,
+		UserID:          identity.ID,
+	}
+	return initwizard.Finalize(ctx, stdout, stdin, input, configDir)
+}
+
+// promptEmail collects the Atlassian account email. If hint is non-empty (from --email),
+// the prompt is skipped. Empty input on hard return is rejected (no default).
+func promptEmail(r io.Reader, w io.Writer, hint string) (string, error) {
+	if hint != "" {
+		return hint, nil
+	}
+	reader := bufio.NewReader(r)
+	for attempt := 0; attempt < 3; attempt++ {
+		fmt.Fprint(w, "Atlassian account email: ")
+		line, err := reader.ReadString('\n')
+		if err != nil && len(line) == 0 {
+			return "", fmt.Errorf("reading email: %w", err)
+		}
+		email := strings.TrimSpace(line)
+		if strings.Contains(email, "@") && strings.Contains(email, ".") {
+			return email, nil
+		}
+		fmt.Fprintln(w, "Expected an email address (must contain '@' and '.').")
+	}
+	return "", fmt.Errorf("no valid email after 3 attempts")
 }

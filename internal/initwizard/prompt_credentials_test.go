@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/secretsink"
+	"github.com/nkzou/cmux-board/internal/secretsink"
 )
 
 // resetSecretsForTest clears the secretsink for test isolation.

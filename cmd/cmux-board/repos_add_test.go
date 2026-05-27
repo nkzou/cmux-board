@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/config"
 )
 
 // setupTempConfigDir sets CMUX_BOARD_CONFIG_DIR to a new temp dir for the duration of t.

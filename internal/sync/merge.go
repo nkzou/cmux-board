@@ -3,8 +3,8 @@ package sync
 import (
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // MergePulledTickets updates tracker-owned fields on existing tickets and appends new

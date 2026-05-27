@@ -12,14 +12,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
-	"github.com/kevin-zou/cmux-board/internal/runtime"
-	"github.com/kevin-zou/cmux-board/internal/secretsink"
-	"github.com/kevin-zou/cmux-board/internal/state"
-	isync "github.com/kevin-zou/cmux-board/internal/sync"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
-	"github.com/kevin-zou/cmux-board/internal/tracker/jira"
-	"github.com/kevin-zou/cmux-board/internal/ui"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/runtime"
+	"github.com/nkzou/cmux-board/internal/secretsink"
+	"github.com/nkzou/cmux-board/internal/state"
+	isync "github.com/nkzou/cmux-board/internal/sync"
+	"github.com/nkzou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/tracker/jira"
+	"github.com/nkzou/cmux-board/internal/ui"
 )
 
 var dockCmd = &cobra.Command{

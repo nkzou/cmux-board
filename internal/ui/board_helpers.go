@@ -1,8 +1,8 @@
 package ui
 
 import (
-	internalsync "github.com/kevin-zou/cmux-board/internal/sync"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	internalsync "github.com/nkzou/cmux-board/internal/sync"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // resolveTickets partitions the snapshot's tickets into mapped and unmapped buckets

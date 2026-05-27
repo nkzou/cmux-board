@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kevin-zou/cmux-board/internal/secretsink"
+	"github.com/nkzou/cmux-board/internal/secretsink"
 )
 
 // Credentials stores adapter-keyed API tokens.

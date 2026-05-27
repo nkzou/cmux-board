@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // mockAdapter is a test double for tracker.IssueTracker.

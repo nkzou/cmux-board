@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/kevin-zou/cmux-board/internal/secretsink"
+	"github.com/nkzou/cmux-board/internal/secretsink"
 )
 
 // maxSitePromptRetries is the maximum number of invalid site input attempts.
