@@ -83,9 +83,13 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		repoID := res.RepoID
 		ps := newPickerState(m.snapshot, ticketID, repoID)
 		if ps == nil {
-			// 0 activations → activate directly (T-062 stub, B3).
-			// 1 activation → focus directly (T-063 stub, B3).
-			return m, nil
+			activations := state.FindActivations(m.snapshot, ticketID, repoID)
+			if len(activations) == 0 {
+				// 0 activations → activate with empty approach name.
+				return m, ActivateCmd(m.ctx, m.store, m.cfg, ticketID, repoID, "")
+			}
+			// 1 activation → focus directly (T-063).
+			return m.focusActivation(activations[0])
 		}
 		// 2+ activations → open activation picker.
 		m.pickerState = ps
@@ -127,8 +131,13 @@ func (m Model) handlePickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 	ps := m.pickerState
 	switch msg.String() {
 	case KeyPickerFocus:
-		// TODO(T-063): call focus.Focus on selected activation.
-		return m, nil
+		if len(ps.entries) == 0 {
+			return m, nil
+		}
+		entry := ps.entries[ps.cursorIdx]
+		m.pickerState = nil
+		m.mode = ModeNormal
+		return m.focusActivation(entry)
 	case KeyPickerNew:
 		m.pickerState = nil
 		m.previousMode = ModePicker
@@ -191,8 +200,27 @@ func (m Model) handleApproachNameMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Blur()
 		m.mode = ModeNormal
-		// TODO(T-062): emit tea.Cmd that calls activate.Activate with name.
-		return m, nil
+		// Determine (ticketID, repoID) from context we came from.
+		var ticketID, repoID string
+		if m.previousMode == ModePicker && m.pickerState != nil {
+			ticketID = m.pickerState.ticketID
+			repoID = m.pickerState.repoID
+			m.pickerState = nil
+		} else {
+			colTickets := m.ticketsForActiveCol()
+			if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+				return m, nil
+			}
+			ticketID = colTickets[m.activeTicketIdx].Key
+			var res RepoResolution
+			m, res = resolveRepoAndRoute(m, ticketID)
+			if res.Cancelled || res.PickerOpened {
+				return m, nil
+			}
+			repoID = res.RepoID
+		}
+		m.previousMode = ModeNormal
+		return m, ActivateCmd(m.ctx, m.store, m.cfg, ticketID, repoID, name)
 	case KeyApproachCancel:
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Blur()
@@ -295,8 +323,12 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// Now check activations for (ticketID, chosenID).
 		ps := newPickerState(m.snapshot, ticketID, chosenID)
 		if ps == nil {
-			// 0 or 1 activations: activate directly (T-062 stub, B3) or focus (T-063 stub).
-			return m, nil
+			activations := state.FindActivations(m.snapshot, ticketID, chosenID)
+			if len(activations) == 0 {
+				return m, ActivateCmd(m.ctx, m.store, m.cfg, ticketID, chosenID, "")
+			}
+			// 1 activation → focus directly (T-063).
+			return m.focusActivation(activations[0])
 		}
 		// 2+ activations: open activation picker.
 		m.pickerState = ps

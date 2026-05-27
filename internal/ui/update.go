@@ -26,6 +26,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleActivationDone(msg)
 	case activationStepMsg:
 		return m.handleActivationStep(msg)
+	case focusResultMsg:
+		return m.handleFocusResult(msg)
 	case toastExpireMsg:
 		return m.expireToasts()
 	default:
@@ -130,6 +132,22 @@ func (m Model) handleActivationDone(msg activationDoneMsg) (Model, tea.Cmd) {
 
 // handleActivationStep is a stub; full implementation in T-062.
 func (m Model) handleActivationStep(_ activationStepMsg) (Model, tea.Cmd) {
+	return m, nil
+}
+
+// handleFocusResult handles the outcome of the Focus goroutine (T-063).
+func (m Model) handleFocusResult(msg focusResultMsg) (Model, tea.Cmd) {
+	res := msg.result
+	if res.Err != nil {
+		return m.pushToast(userFriendlyError(res.Err))
+	}
+	if res.NeedsRespawn {
+		// Show picker so user can press r to respawn.
+		return m.pushToast("claude session gone — open picker to respawn (r)")
+	}
+	if res.NeedsNewTab {
+		return m.pushToast("cmux workspace recreated — new tab opened")
+	}
 	return m, nil
 }
 
