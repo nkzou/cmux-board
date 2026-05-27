@@ -1,62 +1,66 @@
-# OpenKanban
+# cmux-board
 
-Terminal-based kanban board with integrated AI agent spawning for ticket work.
+Terminal-based kanban board with Jira sync and Claude Code agent spawning. Runs inside a cmux Dock sidebar.
 
 ## Stack
 
-Go 1.21+, BubbleTea (TUI), creack/pty, vt10x (terminal emulation)
+Go 1.25+, BubbleTea (TUI), Lipgloss
 
 ## Development
 
 ```bash
-go build ./...    # Build
-go test ./...     # Test
-go run .          # Run
+make build            # Build binary
+make test             # go test -race ./... + verify-additive
+go vet ./...          # Vet
+staticcheck ./...     # Static analysis
 ```
 
 ## Where to Look
 
 | Task | Location |
 |------|----------|
-| Add CLI command | cmd/ |
-| Modify UI/keybindings | internal/ui/ |
-| Change agent behavior | internal/agent/ |
-| Terminal/PTY handling | internal/terminal/ |
-| Board/ticket logic | internal/board/ |
-| Project management | internal/project/ |
-| Configuration | internal/config/ |
-| Git operations | internal/git/ |
+| Add CLI command | `cmd/cmux-board/` |
+| Modify UI/keybindings | `internal/ui/` |
+| Change sync/poll behavior | `internal/sync/` |
+| Jira adapter | `internal/tracker/jira/` |
+| State persistence | `internal/state/` |
+| Configuration | `internal/config/` |
+| Git operations | `internal/git/` |
+| Startup/reconcile | `internal/runtime/` |
+| Init wizard | `internal/initwizard/` |
 
 ## Architecture
 
 ```
-cmd/           CLI entry (cobra)
+cmd/cmux-board/      CLI entry (cobra): init, dock, repos
 internal/
-  ui/          BubbleTea Model - central orchestrator
-  agent/       Agent config, status detection, spawning prep
-  terminal/    PTY management, vt10x rendering, scrollback
-  board/       Ticket/column data structures
-  project/     Multi-project registry, settings cascade
-  config/      JSON config, validation, themes
-  git/         Worktree operations
+  ui/                BubbleTea Model - central orchestrator
+  sync/              Poller, push, backoff, bridge, merge
+  tracker/           IssueTracker interface
+  tracker/jira/      Jira Cloud adapter
+  state/             Atomic JSON store (Mutate/Snapshot)
+  config/            Config, credentials, mode-bit validator
+  claudecli/         claude CLI wrapper
+  cmuxcli/           cmux CLI wrapper
+  git/               Worktree, branch naming, path uniquify
+  runtime/           Startup reconcile, preflight, shutdown, logger
+  initwizard/        Interactive init wizard
+  secretsink/        slog Writer-stage token redaction
 ```
 
 ## Key Flows
 
-**Ticket → Agent spawn:**
-ui.spawnAgent() → terminal.New() → pty.Start() → agent process
+**Ticket activation:**
+`ui.handleEnter()` -> `activate()` -> `git.CreateWorktreeAt()` -> `claudecli.LaunchBackground()` -> `cmuxcli.NewWorkspaceWithLayout()` -> `cmuxcli.FocusPane()`
 
-**Settings cascade:**
-ticket.Field → project.Settings.Field → config.Defaults.Field
+**Background poll:**
+`sync.NewPoller()` -> `bridge.EmitFn()` -> `bridge.RunPushWorker()` -> `tea.Program.Send()`
 
-## Agent Workflow
-
-Scout finds → Librarian reads → You plan → Worker implements → Validator checks
+**State mutation:**
+Any goroutine -> `store.Mutate(func(s *state.State) error {...})` -> atomic JSON write
 
 ## Guidance
 
 Context-specific guidance lives in nested CLAUDE.md files:
-- internal/CLAUDE.md - Go patterns, imports, testing
-- internal/ui/CLAUDE.md - BubbleTea patterns
-- internal/agent/CLAUDE.md - Agent integration
-- internal/terminal/CLAUDE.md - PTY/terminal handling
+- `internal/CLAUDE.md` - Go patterns, imports, testing
+- `internal/ui/CLAUDE.md` - BubbleTea patterns
