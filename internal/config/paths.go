@@ -17,6 +17,9 @@ const (
 	CredentialsFileName = "credentials.json"
 	// EnvCredentialsPath is the environment variable for overriding the credentials path.
 	EnvCredentialsPath = "CMUX_BOARD_CREDENTIALS"
+	// EnvConfigDir is the environment variable for overriding the config directory.
+	// Used in tests and for non-default installations.
+	EnvConfigDir = "CMUX_BOARD_CONFIG_DIR"
 )
 
 // ResolveCredentialsPath returns the path to credentials.json in this priority order:
@@ -37,20 +40,34 @@ func ResolveCredentialsPath(flagVal string) (string, error) {
 	return filepath.Join(home, DefaultConfigDir, CredentialsFileName), nil
 }
 
-// DefaultConfigPath returns ~/.config/cmux-board/config.json.
-func DefaultConfigPath() (string, error) {
+// resolveConfigDir returns the config directory, honouring CMUX_BOARD_CONFIG_DIR if set.
+func resolveConfigDir() (string, error) {
+	if env := os.Getenv(EnvConfigDir); env != "" {
+		return env, nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve home directory: %w", err)
 	}
-	return filepath.Join(home, DefaultConfigDir, ConfigFileName), nil
+	return filepath.Join(home, DefaultConfigDir), nil
 }
 
-// DefaultStatePath returns ~/.config/cmux-board/state.json.
-func DefaultStatePath() (string, error) {
-	home, err := os.UserHomeDir()
+// DefaultConfigPath returns the path to config.json.
+// Respects CMUX_BOARD_CONFIG_DIR if set.
+func DefaultConfigPath() (string, error) {
+	dir, err := resolveConfigDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve home directory: %w", err)
+		return "", err
 	}
-	return filepath.Join(home, DefaultConfigDir, StateFileName), nil
+	return filepath.Join(dir, ConfigFileName), nil
+}
+
+// DefaultStatePath returns the path to state.json.
+// Respects CMUX_BOARD_CONFIG_DIR if set.
+func DefaultStatePath() (string, error) {
+	dir, err := resolveConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, StateFileName), nil
 }
