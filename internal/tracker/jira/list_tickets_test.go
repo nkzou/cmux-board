@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-const boardSearchForProject = `{
-  "isLast": true,
-  "maxResults": 50,
-  "startAt": 0,
-  "total": 1,
-  "values": [
-    {"id": 1, "name": "Test Board", "type": "scrum", "location": "Test Project (TESTPROJ)"}
-  ]
+// boardGetForProject is the JSON shape returned by `acli jira board get --id 1 --json`
+// when resolveProjectKey looks up the board to extract its project key.
+const boardGetForProject = `{
+  "id": 1,
+  "name": "Test Board",
+  "type": "scrum",
+  "location": "Test Project (TESTPROJ)",
+  "link": "https://test.atlassian.net/jira/software/projects/TESTPROJ/boards/1"
 }`
 
 const workitemSearchJSON = `[
@@ -31,9 +31,9 @@ const workitemSearchJSON = `[
 ]`
 
 func TestListTicketsHappyPath(t *testing.T) {
-	// First call: board search (to resolve project key); second: workitem search.
+	// First call: board get (to resolve project key); second: workitem search.
 	runner := sequentialRunner([]runnerResponse{
-		{stdout: []byte(boardSearchForProject), exitCode: 0},
+		{stdout: []byte(boardGetForProject), exitCode: 0},
 		{stdout: []byte(workitemSearchJSON), exitCode: 0},
 	})
 	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
@@ -78,7 +78,7 @@ func TestListTicketsHappyPath(t *testing.T) {
 func TestListTicketsSinceFilter(t *testing.T) {
 	var allArgs [][]string
 	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
-		{stdout: []byte(boardSearchForProject), exitCode: 0},
+		{stdout: []byte(boardGetForProject), exitCode: 0},
 		{stdout: []byte(`[]`), exitCode: 0},
 	})
 	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
@@ -106,7 +106,7 @@ func TestListTicketsSinceFilter(t *testing.T) {
 func TestListTicketsThreeMonthFloorWhenSinceNil(t *testing.T) {
 	var allArgs [][]string
 	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
-		{stdout: []byte(boardSearchForProject), exitCode: 0},
+		{stdout: []byte(boardGetForProject), exitCode: 0},
 		{stdout: []byte(`[]`), exitCode: 0},
 	})
 	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
@@ -130,7 +130,7 @@ func TestListTicketsThreeMonthFloorWhenSinceNil(t *testing.T) {
 func TestListTicketsThreeMonthFloorOverridesOldSince(t *testing.T) {
 	var allArgs [][]string
 	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
-		{stdout: []byte(boardSearchForProject), exitCode: 0},
+		{stdout: []byte(boardGetForProject), exitCode: 0},
 		{stdout: []byte(`[]`), exitCode: 0},
 	})
 	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
@@ -181,7 +181,7 @@ func TestListTicketsNullableFields(t *testing.T) {
 		}
 	}]`
 	runner := sequentialRunner([]runnerResponse{
-		{stdout: []byte(boardSearchForProject), exitCode: 0},
+		{stdout: []byte(boardGetForProject), exitCode: 0},
 		{stdout: []byte(nullableJSON), exitCode: 0},
 	})
 	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
@@ -202,13 +202,38 @@ func TestListTicketsNullableFields(t *testing.T) {
 }
 
 func TestListTicketsBoardNotFound(t *testing.T) {
-	// Board search returns no boards.
-	runner := fakeRunner([]byte(`{"isLast":true,"maxResults":50,"startAt":0,"total":0,"values":[]}`), nil, 0, nil)
+	// board get returns an empty JSON object when the board doesn't exist
+	// (id == 0 in our acliBoardGetResult struct, which resolveProjectKey treats as not-found).
+	runner := fakeRunner([]byte(`{}`), nil, 0, nil)
 	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
 
 	_, err := a.ListTickets(context.Background(), "999", nil)
 	if err == nil {
 		t.Fatal("expected error for unknown board, got nil")
+	}
+}
+
+func TestResolveProjectKey_CallsBoardGetNotSearch(t *testing.T) {
+	var allArgs [][]string
+	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
+		{stdout: []byte(boardGetForProject), exitCode: 0},
+		{stdout: []byte(`[]`), exitCode: 0},
+	})
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
+
+	if _, err := a.ListTickets(context.Background(), "1", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	first := strings.Join(allArgs[0], " ")
+	if !strings.Contains(first, "board get") {
+		t.Errorf("first call should be 'board get', got: %v", allArgs[0])
+	}
+	if strings.Contains(first, "board search") {
+		t.Errorf("first call must NOT be 'board search' (hangs on accounts with many boards), got: %v", allArgs[0])
+	}
+	if !strings.Contains(first, "--id 1") {
+		t.Errorf("first call should pass --id 1, got: %v", allArgs[0])
 	}
 }
 
