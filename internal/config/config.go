@@ -29,6 +29,14 @@ type Config struct {
 	DryRun bool `json:"dry_run,omitempty"`
 }
 
+// ColumnConfig is one entry in the adapter_config.columns array.
+// Statuses is a list of Jira status names (not IDs) that map to this column.
+// The order of entries in the parent array is the display order on the board.
+type ColumnConfig struct {
+	Name     string   `json:"name"`
+	Statuses []string `json:"statuses"`
+}
+
 // RepoEntry is one registered repository.
 type RepoEntry struct {
 	ID            string `json:"id"`
@@ -78,4 +86,40 @@ func Save(path string, cfg Config) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 	return WriteFileAtomic(path, data, 0644)
+}
+
+// ParseAdapterColumns reads the "columns" key from an adapter_config map and returns
+// the parsed []ColumnConfig. Returns an empty slice (never nil) if the key is absent
+// or the value cannot be decoded. Errors are non-fatal by design: a missing or
+// malformed columns entry degrades gracefully to "all tickets in Unmapped".
+func ParseAdapterColumns(adapterCfg map[string]any) []ColumnConfig {
+	if adapterCfg == nil {
+		return []ColumnConfig{}
+	}
+	raw, ok := adapterCfg["columns"]
+	if !ok {
+		return []ColumnConfig{}
+	}
+	// Re-marshal then unmarshal through the typed struct to handle the
+	// map[string]any representation that JSON unmarshaling produces.
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return []ColumnConfig{}
+	}
+	var cols []ColumnConfig
+	if err := json.Unmarshal(data, &cols); err != nil {
+		return []ColumnConfig{}
+	}
+	return cols
+}
+
+// SetAdapterColumns stores cols into the "columns" key of adapterCfg.
+// If adapterCfg is nil, a new map is allocated and returned.
+func SetAdapterColumns(adapterCfg map[string]any, cols []ColumnConfig) map[string]any {
+	if adapterCfg == nil {
+		adapterCfg = make(map[string]any)
+	}
+	// Store as a value that will round-trip correctly through JSON.
+	adapterCfg["columns"] = cols
+	return adapterCfg
 }
