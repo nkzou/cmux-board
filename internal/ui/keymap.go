@@ -107,8 +107,8 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.assignmentEditor = newAssignmentEditorState(m.cfg, m.snapshot, ticketID)
 		m.mode = ModeAssignmentEditor
 	case KeyFilter:
-		// TODO(T-066): focus filter input.
 		m.mode = ModeFilter
+		m.filterInput.Focus()
 	case KeyHelp:
 		m.mode = ModeHelp
 	case KeyQuit:
@@ -251,14 +251,6 @@ func (m Model) handleAssignmentEditorMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if ed.cursorIdx > 0 {
 			m.assignmentEditor.cursorIdx--
 		}
-	}
-	return m, nil
-}
-
-// handleFilterMode is a stub. Full implementation in T-066.
-func (m Model) handleFilterMode(msg tea.KeyMsg) (Model, tea.Cmd) {
-	if msg.String() == KeyEsc {
-		m.mode = ModeNormal
 	}
 	return m, nil
 }
