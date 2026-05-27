@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -29,16 +26,9 @@ func init() {
 	initCmd.Flags().Bool("force", false, "overwrite config + credentials, preserve state.json")
 	initCmd.Flags().Bool("reset", false, "remove config.json, state.json, credentials.json and re-run wizard")
 
-	// SECURITY: --api-token is intentionally NOT a flag. The token is read
-	// exclusively via --api-token-stdin (stdin pipe) or interactive masked prompt.
-	// F4 / CONVENTIONS §"API token via --api-token-stdin or interactive only".
-	initCmd.Flags().Bool("api-token-stdin", false,
-		"read API token from stdin (pipe or redirect); token is never passed via flag value")
-
-	// Additional per-field flags for non-interactive mode.
+	// Per-field flags for non-interactive mode.
 	initCmd.Flags().String("adapter", "", "adapter name (e.g. jira)")
-	initCmd.Flags().String("site", "", "Jira site URL (e.g. yourorg.atlassian.net)")
-	initCmd.Flags().String("email", "", "Atlassian account email (used for Basic auth)")
+	initCmd.Flags().String("site", "", "Jira site URL (e.g. yourorg.atlassian.net); resolved from acli auth status if not provided")
 	initCmd.Flags().String("board-id", "", "board ID to select without prompting")
 	initCmd.Flags().StringSlice("repo", nil, "repo paths to register non-interactively (comma-separated or repeated)")
 	initCmd.Flags().Bool("non-interactive", false, "run wizard without any prompts (all values from flags)")
@@ -143,10 +133,8 @@ func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
 	stdin := cmd.InOrStdin()
 
 	siteFlag, _ := cmd.Flags().GetString("site")
-	emailFlag, _ := cmd.Flags().GetString("email")
 	boardIDFlag, _ := cmd.Flags().GetString("board-id")
 	repoFlag, _ := cmd.Flags().GetStringSlice("repo")
-	tokenFromStdin, _ := cmd.Flags().GetBool("api-token-stdin")
 
 	// 1. Adapter pick (v1 always picks jira; flag is accepted but the menu still shows
 	// the single option for clarity).
@@ -154,50 +142,41 @@ func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
 		return fmt.Errorf("adapter pick: %w", err)
 	}
 
-	// 2. Credentials (site + token).
-	creds, err := initwizard.PromptJiraCredentials(stdin, stdout, siteFlag, tokenFromStdin)
-	if err != nil {
-		return fmt.Errorf("credentials: %w", err)
-	}
-
-	// 3. Email (Basic-auth requires email; collected separately from token since email
-	// is not a secret and not registered with secretsink).
-	email, err := promptEmail(stdin, stdout, emailFlag)
-	if err != nil {
-		return fmt.Errorf("email: %w", err)
-	}
-
-	// 4. Build the jira adapter from collected credentials.
+	// 2. Build adapter — site from flag or resolved from acli auth status.
+	// ProbeACLI will determine the site by calling WhoAmI (acli auth status).
 	adapter := jira.NewJiraAdapter(jira.Credentials{
-		Site:     creds.Site,
-		Email:    email,
-		APIToken: creds.APIToken,
+		Site: siteFlag,
 	})
 
-	// 5. Auth probe (WhoAmI) — fails fast on a bad token.
-	identity, err := initwizard.ProbeAuth(ctx, stdout, adapter)
+	// 3. Probe acli: verify installed + authenticated, resolve identity.
+	identity, err := initwizard.ProbeACLI(ctx, stdout, adapter)
 	if err != nil {
 		return err
 	}
 
-	// 6. Board pick (interactive or --board-id override).
+	// If site was not provided via flag, use the site from acli auth status (identity.ID).
+	site := siteFlag
+	if site == "" {
+		site = identity.ID // WhoAmI stores site in ID field for acli adapter
+	}
+
+	// 4. Board pick (interactive or --board-id override).
 	board, err := initwizard.PickBoard(ctx, stdout, stdin, adapter, boardIDFlag)
 	if err != nil {
 		return fmt.Errorf("board pick: %w", err)
 	}
 
-	// 7. Repo registration (interactive loop or --repo override).
+	// 5. Repo registration (interactive loop or --repo override).
 	repos, err := initwizard.RegisterRepos(ctx, stdout, stdin, repoFlag, nil, nil)
 	if err != nil {
 		return fmt.Errorf("repos: %w", err)
 	}
 
-	// 8. Finalize: confirmation prompt, write three files atomically, print Dock snippet.
+	// 6. Finalize: confirmation prompt, write three files atomically, print Dock snippet.
 	input := initwizard.WizardInput{
 		Adapter:         "jira",
-		Site:            creds.Site,
-		Email:           email,
-		APIToken:        creds.APIToken,
+		Site:            site,
+		Email:           identity.Email,
 		BoardID:         board.ID,
 		BoardName:       board.Name,
 		WorktreeBaseDir: filepath.Join(configDir, "worktrees"),
@@ -206,26 +185,4 @@ func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
 		UserID:          identity.ID,
 	}
 	return initwizard.Finalize(ctx, stdout, stdin, input, configDir)
-}
-
-// promptEmail collects the Atlassian account email. If hint is non-empty (from --email),
-// the prompt is skipped. Empty input on hard return is rejected (no default).
-func promptEmail(r io.Reader, w io.Writer, hint string) (string, error) {
-	if hint != "" {
-		return hint, nil
-	}
-	reader := bufio.NewReader(r)
-	for attempt := 0; attempt < 3; attempt++ {
-		fmt.Fprint(w, "Atlassian account email: ")
-		line, err := reader.ReadString('\n')
-		if err != nil && len(line) == 0 {
-			return "", fmt.Errorf("reading email: %w", err)
-		}
-		email := strings.TrimSpace(line)
-		if strings.Contains(email, "@") && strings.Contains(email, ".") {
-			return email, nil
-		}
-		fmt.Fprintln(w, "Expected an email address (must contain '@' and '.').")
-	}
-	return "", fmt.Errorf("no valid email after 3 attempts")
 }
