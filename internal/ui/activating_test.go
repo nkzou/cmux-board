@@ -125,6 +125,48 @@ func TestSpinnerGlyph_NonEmpty(t *testing.T) {
 	}
 }
 
+// TestHandleActivationDone_RefreshesSnapshot pins the badge-update fix.
+// The activation goroutine writes the new ActivationEntry directly to the
+// store via Mutate; without an explicit refreshSnapshot in
+// handleActivationDone the Model's cached snapshot would not see the new
+// entry and the worktree badge would be missing until the next poll.
+func TestHandleActivationDone_RefreshesSnapshot(t *testing.T) {
+	m := newGuardTestModel(t)
+	m, _ = m.tryActivate("PROJ-1", "my-repo", "")
+
+	// Simulate the Activate goroutine journaling a new entry into the store
+	// while the Model's snapshot still points at the pre-activation state.
+	if err := m.store.Mutate(func(s *state.State) error {
+		if s.Activations == nil {
+			s.Activations = make(map[string][]state.ActivationEntry)
+		}
+		s.Activations["PROJ-1"] = append(s.Activations["PROJ-1"], state.ActivationEntry{
+			ActivationID: "act-1",
+			TicketID:     "PROJ-1",
+			RepoID:       "my-repo",
+		})
+		return nil
+	}); err != nil {
+		t.Fatalf("seed activation: %v", err)
+	}
+
+	// Sanity check: stale snapshot has no activation yet.
+	if state.ActivationCount(m.snapshot, "PROJ-1") != 0 {
+		t.Fatalf("precondition: model snapshot should be stale (0), got %d",
+			state.ActivationCount(m.snapshot, "PROJ-1"))
+	}
+
+	mAfter, _ := m.handleActivationDone(activationDoneMsg{
+		TicketID:     "PROJ-1",
+		ActivationID: "act-1",
+	})
+
+	if state.ActivationCount(mAfter.snapshot, "PROJ-1") != 1 {
+		t.Errorf("handleActivationDone did not refresh snapshot; ActivationCount(PROJ-1) = %d, want 1",
+			state.ActivationCount(mAfter.snapshot, "PROJ-1"))
+	}
+}
+
 // errSentinel is a minimal stand-in error for activation-failure tests so the
 // helper does not depend on production error sentinels.
 type errSentinel string
