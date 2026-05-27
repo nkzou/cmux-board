@@ -16,29 +16,31 @@ const rawKeyWorkflowTransitions = "workflow_transitions"
 // name→ID map in ticket.Raw[rawKeyWorkflowTransitions].
 //
 // Cache hit (already populated): returns nil without making an HTTP request.
-// Cache miss: calls fetchTransitions and builds the map.
+// Cache miss: calls Issue.Transitions and builds the map.
 // On error: Raw is NOT modified (no partial write).
 //
 // This is IN-MEMORY ONLY — do NOT call state.Store.Mutate here.
-// The Raw field is ephemeral and intentionally excluded from state.json persistence.
-//
-// Called by M-004 push handler before invoking TransitionStatus when RequiresWorkflowID is true.
-func LoadTransitionCache(ctx context.Context, client *jiraClient, ticket *tracker.Ticket) error {
+func LoadTransitionCache(ctx context.Context, adapter *JiraAdapter, ticket *tracker.Ticket) error {
 	// Cache hit check.
 	if existing, ok := ticket.Raw[rawKeyWorkflowTransitions]; ok {
 		if m, ok := existing.(map[string]string); ok && len(m) > 0 {
-			return nil // cache already populated
+			return nil
 		}
 	}
 
-	entries, err := fetchTransitions(ctx, client, ticket.ID)
+	transitions, resp, err := adapter.v3.Issue.Transitions(ctx, ticket.ID)
 	if err != nil {
+		if resp != nil {
+			return fmt.Errorf("failed to load transition cache for %s: %w", ticket.Key, mapResponseError(resp))
+		}
 		return fmt.Errorf("failed to load transition cache for %s: %w", ticket.Key, err)
 	}
 
-	cache := make(map[string]string, len(entries))
-	for _, e := range entries {
-		cache[e.Name] = e.ID
+	cache := make(map[string]string)
+	if transitions != nil {
+		for _, e := range transitions.Transitions {
+			cache[e.Name] = e.ID
+		}
 	}
 	ticket.Raw[rawKeyWorkflowTransitions] = cache
 
@@ -48,7 +50,6 @@ func LoadTransitionCache(ctx context.Context, client *jiraClient, ticket *tracke
 // TransitionIDFromRaw reads the cached workflow transition ID for a given target status name.
 // The lookup is case-insensitive.
 // Returns ("", false) when Raw is nil, the cache key is absent, or no match is found.
-// This is a pure in-memory operation — no context needed.
 func TransitionIDFromRaw(ticket *tracker.Ticket, toStatusName string) (string, bool) {
 	if ticket.Raw == nil {
 		return "", false
@@ -70,8 +71,6 @@ func TransitionIDFromRaw(ticket *tracker.Ticket, toStatusName string) (string, b
 }
 
 // WipeTransitionCache clears the workflow transition cache from a ticket's Raw map.
-// Called by the poll handler after each ListTickets refresh to clear stale IDs.
-// This operates on an in-memory tracker.Ticket value — NOT on state.json.
 func WipeTransitionCache(ticket *tracker.Ticket) {
 	if ticket.Raw != nil {
 		delete(ticket.Raw, rawKeyWorkflowTransitions)
