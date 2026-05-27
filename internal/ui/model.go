@@ -42,6 +42,8 @@ type Model struct {
 
 	// Inline inputs (one each; only one active at a time)
 	approachNameInput textinput.Model
+	filterInput       textinput.Model
+	filterQuery       string
 
 	// Overlay sub-states (nil when not active)
 	pickerState      *pickerState
@@ -80,6 +82,11 @@ func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.S
 	input.Placeholder = "approach name"
 	input.CharLimit = 64
 
+	fi := textinput.New()
+	fi.Placeholder = "Filter tickets..."
+	fi.CharLimit = 100
+	fi.Width = 30
+
 	snap, rev := store.Snapshot()
 
 	return Model{
@@ -91,6 +98,7 @@ func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.S
 		board:             snap.Board,
 		mode:              ModeNormal,
 		approachNameInput: input,
+		filterInput:       fi,
 	}
 }
 
