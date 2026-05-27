@@ -2,7 +2,7 @@ BINARY := cmux-board
 GO := go
 COVERAGE_FILE := coverage.out
 
-.PHONY: build test lint clean coverage test-integration verify-additive
+.PHONY: build test lint clean coverage test-integration test-e2e verify-additive
 
 build:
 	$(GO) build -o $(BINARY) ./cmd/cmux-board
@@ -22,6 +22,9 @@ lint:
 
 clean:
 	rm -f $(BINARY) $(COVERAGE_FILE) coverage.html
+
+test-e2e:
+	$(GO) test -tags e2e -race -timeout 15m ./internal/runtime/...
 
 verify-additive:
 	bash scripts/check_additive_only.sh
