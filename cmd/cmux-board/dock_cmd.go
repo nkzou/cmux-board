@@ -14,7 +14,6 @@ import (
 
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/runtime"
-	"github.com/nkzou/cmux-board/internal/secretsink"
 	"github.com/nkzou/cmux-board/internal/state"
 	isync "github.com/nkzou/cmux-board/internal/sync"
 	"github.com/nkzou/cmux-board/internal/tracker"
@@ -51,6 +50,9 @@ type dockDeps struct {
 	openState func(path string) (*state.Store, error)
 	// reconcile runs startup reconciliation.
 	reconcile func(ctx context.Context, store *state.Store, cfg *config.Config) error
+	// checkACLI verifies acli is installed and authenticated before starting.
+	// Returns an error with an actionable message if acli is absent or unauthenticated.
+	checkACLI func(ctx context.Context) error
 	// newTracker constructs the issue tracker from credentials.
 	newTracker func(creds config.Credentials) tracker.IssueTracker
 	// runProgram runs the BubbleTea program and returns when the user quits.
@@ -77,15 +79,14 @@ func prodDockDeps() dockDeps {
 		reconcile: func(ctx context.Context, store *state.Store, cfg *config.Config) error {
 			return runtime.ReconcileIncompleteActivations(ctx, store, cfg)
 		},
+		checkACLI: checkACLIPreflight,
 		newTracker: func(creds config.Credentials) tracker.IssueTracker {
 			jiraCreds, ok := creds.Adapters["jira"]
 			if !ok {
 				return nil
 			}
 			return jira.NewJiraAdapter(jira.Credentials{
-				Site:     jiraCreds.SiteURL,
-				Email:    jiraCreds.Email,
-				APIToken: jiraCreds.APIToken,
+				Site: jiraCreds.SiteURL,
 			})
 		},
 		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error {
@@ -148,11 +149,9 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 		return fmt.Errorf("failed to load credentials: %w", err)
 	}
 
-	// Step 2: Register API token with secretsink BEFORE NewLogger — so the
-	// very first log line is already redacted (Codex Finding 7 / Mandatory Invariant 1).
-	if jiraCreds, ok := creds.Adapters["jira"]; ok {
-		secretsink.Register(jiraCreds.APIToken)
-	}
+	// Step 2: (acli adapter) No API token to register — acli owns credentials.
+	// secretsink stays active for any other adapters or future secrets.
+	_ = creds
 
 	// Step 3: Install global slog logger with secretsink redaction active.
 	deps.newLogger(resolveLogLevel(logLevelStr), deps.logWriter)
@@ -184,6 +183,13 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 		slog.Warn("startup reconciliation encountered errors", "err", err)
 	}
 
+	// Step 7.5: acli pre-flight — verify acli is installed and authenticated.
+	if deps.checkACLI != nil {
+		if err := deps.checkACLI(ctx); err != nil {
+			return err
+		}
+	}
+
 	// Construct the tracker adapter.
 	tr := deps.newTracker(creds)
 
@@ -207,6 +213,18 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 	cancel()
 	coord.Run(ctx)
 
+	return nil
+}
+
+// checkACLIPreflight verifies that acli is installed and authenticated.
+// Runs 'acli jira auth status' and returns an actionable error if the check fails.
+// This is called before the adapter is constructed so startup fails fast with a clear message.
+func checkACLIPreflight(ctx context.Context) error {
+	adapter := jira.NewJiraAdapter(jira.Credentials{})
+	_, err := adapter.WhoAmI(ctx)
+	if err != nil {
+		return fmt.Errorf("acli pre-flight failed: %w\nRun 'acli jira auth login --web' and retry", err)
+	}
 	return nil
 }
 
