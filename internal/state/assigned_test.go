@@ -27,24 +27,24 @@ func TestAssignedRepoIDs_Empty(t *testing.T) {
 
 func TestAssignedRepoIDs_NonEmpty(t *testing.T) {
 	s := makeTestState(map[string]TicketState{
-		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"openkanban", "cmux-board"}},
+		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"my-service", "cmux-board"}},
 	})
 	got := AssignedRepoIDs(s, "PROJ-42")
-	if len(got) != 2 || got[0] != "openkanban" || got[1] != "cmux-board" {
-		t.Errorf("got %v, want [openkanban cmux-board]", got)
+	if len(got) != 2 || got[0] != "my-service" || got[1] != "cmux-board" {
+		t.Errorf("got %v, want [my-service cmux-board]", got)
 	}
 }
 
 func TestAssignedRepoIDs_IsCopy(t *testing.T) {
 	s := makeTestState(map[string]TicketState{
-		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"openkanban"}},
+		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"my-service"}},
 	})
 	got1 := AssignedRepoIDs(s, "PROJ-42")
 	// Mutate the returned slice.
 	got1[0] = "mutated"
 	// Re-read: original should be unchanged.
 	got2 := AssignedRepoIDs(s, "PROJ-42")
-	if got2[0] != "openkanban" {
+	if got2[0] != "my-service" {
 		t.Errorf("original modified; got %v", got2)
 	}
 }
@@ -60,20 +60,20 @@ func TestAddAssignment_HappyPath(t *testing.T) {
 	s := makeTestState(map[string]TicketState{
 		"PROJ-42": {Key: "PROJ-42"},
 	})
-	if err := AddAssignment(s, "PROJ-42", "openkanban"); err != nil {
+	if err := AddAssignment(s, "PROJ-42", "my-service"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := AssignedRepoIDs(s, "PROJ-42")
-	if len(got) != 1 || got[0] != "openkanban" {
-		t.Errorf("got %v, want [openkanban]", got)
+	if len(got) != 1 || got[0] != "my-service" {
+		t.Errorf("got %v, want [my-service]", got)
 	}
 }
 
 func TestAddAssignment_Idempotent(t *testing.T) {
 	s := makeTestState(map[string]TicketState{
-		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"openkanban"}},
+		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"my-service"}},
 	})
-	if err := AddAssignment(s, "PROJ-42", "openkanban"); err != nil {
+	if err := AddAssignment(s, "PROJ-42", "my-service"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := AssignedRepoIDs(s, "PROJ-42")
@@ -100,7 +100,7 @@ func TestAddAssignment_InsertsOrder(t *testing.T) {
 
 func TestAddAssignment_TicketAbsent(t *testing.T) {
 	s := makeTestState(nil)
-	err := AddAssignment(s, "NONEXISTENT", "openkanban")
+	err := AddAssignment(s, "NONEXISTENT", "my-service")
 	if err == nil {
 		t.Error("expected error for absent ticket, got nil")
 	}
@@ -108,9 +108,9 @@ func TestAddAssignment_TicketAbsent(t *testing.T) {
 
 func TestRemoveAssignment_HappyPath(t *testing.T) {
 	s := makeTestState(map[string]TicketState{
-		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"openkanban", "cmux-board"}},
+		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"my-service", "cmux-board"}},
 	})
-	if err := RemoveAssignment(s, "PROJ-42", "openkanban"); err != nil {
+	if err := RemoveAssignment(s, "PROJ-42", "my-service"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := AssignedRepoIDs(s, "PROJ-42")
@@ -121,20 +121,20 @@ func TestRemoveAssignment_HappyPath(t *testing.T) {
 
 func TestRemoveAssignment_NotPresent(t *testing.T) {
 	s := makeTestState(map[string]TicketState{
-		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"openkanban"}},
+		"PROJ-42": {Key: "PROJ-42", AssignedRepoIDs: []string{"my-service"}},
 	})
 	if err := RemoveAssignment(s, "PROJ-42", "ghost"); err != nil {
 		t.Fatalf("unexpected error for absent repoID: %v", err)
 	}
 	got := AssignedRepoIDs(s, "PROJ-42")
-	if len(got) != 1 || got[0] != "openkanban" {
+	if len(got) != 1 || got[0] != "my-service" {
 		t.Errorf("slice changed unexpectedly; got %v", got)
 	}
 }
 
 func TestRemoveAssignment_TicketAbsent(t *testing.T) {
 	s := makeTestState(nil)
-	if err := RemoveAssignment(s, "NONEXISTENT", "openkanban"); err != nil {
+	if err := RemoveAssignment(s, "NONEXISTENT", "my-service"); err != nil {
 		t.Errorf("expected nil error for absent ticket, got %v", err)
 	}
 }
@@ -189,7 +189,7 @@ func TestMutateIntegration(t *testing.T) {
 
 	// Add assignment inside Mutate.
 	if err := store.Mutate(func(s *State) error {
-		return AddAssignment(s, "PROJ-42", "openkanban")
+		return AddAssignment(s, "PROJ-42", "my-service")
 	}); err != nil {
 		t.Fatalf("Mutate (AddAssignment): %v", err)
 	}
@@ -197,7 +197,7 @@ func TestMutateIntegration(t *testing.T) {
 	// Snapshot should reflect the assignment.
 	snap, _ := store.Snapshot()
 	got := AssignedRepoIDs(snap, "PROJ-42")
-	if len(got) != 1 || got[0] != "openkanban" {
-		t.Errorf("after Mutate, got %v, want [openkanban]", got)
+	if len(got) != 1 || got[0] != "my-service" {
+		t.Errorf("after Mutate, got %v, want [my-service]", got)
 	}
 }

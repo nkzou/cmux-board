@@ -16,15 +16,15 @@ var testTicket = tracker.Ticket{
 }
 
 var testRepo = config.RepoEntry{
-	Name:          "openkanban",
-	Path:          "/home/user/openkanban",
+	Name:          "my-service",
+	Path:          "/home/user/my-service",
 	DefaultBranch: "main",
 }
 
 var testData = PromptData{
 	Ticket:       testTicket,
 	Repo:         testRepo,
-	WorktreePath: "/home/user/worktrees/openkanban-PROJ-42-main-01ab23cd",
+	WorktreePath: "/home/user/worktrees/my-service-PROJ-42-main-01ab23cd",
 	ApproachName: "main",
 }
 
@@ -33,7 +33,7 @@ func TestRenderPromptHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, want := range []string{"PROJ-42", "Fix login bug", "openkanban", "/home/user/worktrees/openkanban-PROJ-42-main-01ab23cd", "main"} {
+	for _, want := range []string{"PROJ-42", "Fix login bug", "my-service", "/home/user/worktrees/my-service-PROJ-42-main-01ab23cd", "main"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("rendered output missing %q; got:\n%s", want, got)
 		}
@@ -49,7 +49,7 @@ func TestRenderPromptCustomTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := "Ticket: PROJ-42 Repo: openkanban WT: /home/user/worktrees/openkanban-PROJ-42-main-01ab23cd"
+	want := "Ticket: PROJ-42 Repo: my-service WT: /home/user/worktrees/my-service-PROJ-42-main-01ab23cd"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -61,7 +61,7 @@ func TestRenderPromptMultiRepoVars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := "openkanban|/home/user/openkanban|main"
+	want := "my-service|/home/user/my-service|main"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

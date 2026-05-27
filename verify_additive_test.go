@@ -1,4 +1,4 @@
-// Package verify provides a Go test wrapper for the six-arm negative-grep
+// Package verify provides a Go test wrapper for the eight-arm negative-grep
 // enforcement script (scripts/check_additive_only.sh). Running `go test .`
 // at the repo root executes the same checks as `make verify-additive`, so
 // regressions are caught by both make targets and CI test suites.
@@ -11,7 +11,7 @@ import (
 
 // TestAdditiveOnly runs scripts/check_additive_only.sh as a subprocess.
 // The test fails if the script exits non-zero, which means at least one of
-// the seven grep arms found a forbidden pattern in the production source tree.
+// the eight grep arms found a forbidden pattern in the production source tree.
 //
 // This test is the canonical enforcement of the CONVENTIONS.md immutable
 // constraints listed in the script. It deliberately does NOT inline the grep

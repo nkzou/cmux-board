@@ -13,7 +13,7 @@ const listWorkspacesJSON = `{
     {
       "ref": "workspace:1",
       "title": "release suffix",
-      "current_directory": "/Users/kevin.zou/git/openkanban",
+      "current_directory": "/Users/kevin.zou/git/cmux-board",
       "selected": true,
       "pinned": false,
       "index": 0
@@ -21,7 +21,7 @@ const listWorkspacesJSON = `{
     {
       "ref": "workspace:2",
       "title": "PROJ-42 [abc12345]",
-      "current_directory": "/Users/kevin.zou/code/worktrees/openkanban-PROJ-42-main-abc12345",
+      "current_directory": "/Users/kevin.zou/code/worktrees/my-service-PROJ-42-main-abc12345",
       "selected": false,
       "pinned": false,
       "index": 1
@@ -98,7 +98,7 @@ func TestIsOrphan_PresentRef(t *testing.T) {
 // a target worktree path is NOT returned as a match by IsOrphan (which only matches by ref).
 // This confirms the adoption-by-heuristic path does not exist in the API surface (E8).
 func TestNoCurrentDirectoryAdoption(t *testing.T) {
-	targetWorktree := "/Users/kevin.zou/code/worktrees/openkanban-PROJ-42-main-abc12345"
+	targetWorktree := "/Users/kevin.zou/code/worktrees/my-service-PROJ-42-main-abc12345"
 	workspaces := []Workspace{
 		{
 			Ref:              "workspace:99",

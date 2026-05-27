@@ -42,7 +42,7 @@ type IdentifyResult struct {
 //	{
 //	  "ref": "workspace:1",
 //	  "title": "release suffix",
-//	  "current_directory": "/Users/kevin.zou/git/openkanban",
+//	  "current_directory": "/Users/kevin.zou/git/cmux-board",
 //	  "selected": true,
 //	  "pinned": false,
 //	  "index": 0
