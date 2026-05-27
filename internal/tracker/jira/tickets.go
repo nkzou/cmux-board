@@ -102,12 +102,16 @@ func (a *JiraAdapter) ListTickets(ctx context.Context, boardID string, since *ti
 	return tickets, nil
 }
 
-// resolveProjectKey finds the project key for the given boardID by calling board search
-// and parsing the location string. The location format is "ProjectName (PROJKEY)".
+// resolveProjectKey finds the project key for the given boardID by calling
+// 'acli jira board get --id N --json' and parsing the location string
+// ("ProjectName (PROJKEY)"). A direct lookup keeps us from paginating through
+// every board on the account — the search call can take many seconds against
+// instances with thousands of boards.
 func (a *JiraAdapter) resolveProjectKey(ctx context.Context, boardID string) (string, error) {
 	stdout, stderr, exitCode, err := a.runner(ctx,
-		"jira", "board", "search",
-		"--json", "--paginate",
+		"jira", "board", "get",
+		"--id", boardID,
+		"--json",
 	)
 	if err != nil {
 		return "", fmt.Errorf("resolveProjectKey: failed to run acli: %w", err)
@@ -116,22 +120,20 @@ func (a *JiraAdapter) resolveProjectKey(ctx context.Context, boardID string) (st
 		return "", ferr
 	}
 
-	var result acliBoardSearchResult
+	var result acliBoardGetResult
 	if err := json.Unmarshal(stdout, &result); err != nil {
-		return "", fmt.Errorf("resolveProjectKey: failed to parse board search: %w", err)
+		return "", fmt.Errorf("resolveProjectKey: failed to parse board get: %w", err)
+	}
+	if result.ID == 0 {
+		return "", fmt.Errorf("resolveProjectKey: board %s not found", boardID)
 	}
 
-	for _, b := range result.Values {
-		if fmt.Sprintf("%d", b.ID) == boardID {
-			key := extractProjectKey(b.Location)
-			if key != "" {
-				return key, nil
-			}
-			// Fallback: if location doesn't match pattern, try board name.
-			break
-		}
+	key := extractProjectKey(result.Location)
+	if key == "" {
+		return "", fmt.Errorf("resolveProjectKey: board %s has no parseable project key in location %q",
+			boardID, result.Location)
 	}
-	return "", fmt.Errorf("resolveProjectKey: board %s not found in board search results", boardID)
+	return key, nil
 }
 
 // extractProjectKey parses the project key from the location string "ProjectName (KEY)".
