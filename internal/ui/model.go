@@ -46,6 +46,7 @@ type Model struct {
 	// Overlay sub-states (nil when not active)
 	pickerState      *pickerState
 	assignmentEditor *assignmentEditorState
+	repoPicker       *repoPickerState
 
 	// Status pills
 	trackerPill pillState

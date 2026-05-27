@@ -73,21 +73,23 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		ticketID := colTickets[m.activeTicketIdx].Key
-		assignedIDs := state.AssignedRepoIDs(m.snapshot, ticketID)
-
-		// TODO(T-064): full resolveRepoForActivation wiring replaces this stub.
-		// For now: if exactly 1 repo assigned, open picker or activate directly.
-		if len(assignedIDs) == 1 {
-			repoID := assignedIDs[0]
-			ps := newPickerState(m.snapshot, ticketID, repoID)
-			if ps == nil {
-				// 0 or 1 activations: activate directly (T-062) or focus (T-063).
-				// Both are B3 stubs.
-				return m, nil
-			}
-			m.pickerState = ps
-			m.mode = ModePicker
+		var res RepoResolution
+		m, res = resolveRepoAndRoute(m, ticketID)
+		if res.Cancelled || res.PickerOpened {
+			// Cancelled → toast was pushed; PickerOpened → ModeRepoPicker is now active.
+			return m, nil
 		}
+		// Exactly 1 repo assigned: check for existing activations.
+		repoID := res.RepoID
+		ps := newPickerState(m.snapshot, ticketID, repoID)
+		if ps == nil {
+			// 0 activations → activate directly (T-062 stub, B3).
+			// 1 activation → focus directly (T-063 stub, B3).
+			return m, nil
+		}
+		// 2+ activations → open activation picker.
+		m.pickerState = ps
+		m.mode = ModePicker
 		return m, nil
 	case KeyNewApproach:
 		// Capital N: new approach regardless of existing activations (F16).
@@ -257,6 +259,70 @@ func (m Model) handleAssignmentEditorMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 func (m Model) handleFilterMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if msg.String() == KeyEsc {
 		m.mode = ModeNormal
+	}
+	return m, nil
+}
+
+// handleRepoPickerMode handles key events in ModeRepoPicker (first-touch / multi-repo picker).
+func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.repoPicker == nil {
+		m.mode = ModeNormal
+		return m, nil
+	}
+	rp := m.repoPicker
+	switch msg.String() {
+	case KeyPickerFocus: // "enter" — same constant as KeyActivate
+		if len(rp.rows) == 0 {
+			return m, nil
+		}
+		row := rp.rows[rp.cursorIdx]
+		if row.stale {
+			// Stale repo: surface toast and cancel (E-MR1).
+			m.repoPicker = nil
+			m.mode = ModeNormal
+			return m.pushToast("repo " + row.repoID + " not registered — use picker key `a` to remove it")
+		}
+		ticketID := rp.ticketID
+		firstTouch := rp.firstTouch
+		chosenID := row.repoID
+		m.repoPicker = nil
+		m.mode = ModeNormal
+
+		if firstTouch {
+			// Append chosen repo to assigned_repo_ids.
+			if err := m.store.Mutate(func(s *state.State) error {
+				return state.AddAssignment(s, ticketID, chosenID)
+			}); err != nil {
+				return m.pushToast("assign failed: " + err.Error())
+			}
+			snap, rev := m.store.Snapshot()
+			m.snapshot = snap
+			m.snapshotRev = rev
+		}
+
+		// Now check activations for (ticketID, chosenID).
+		ps := newPickerState(m.snapshot, ticketID, chosenID)
+		if ps == nil {
+			// 0 or 1 activations: activate directly (T-062 stub, B3) or focus (T-063 stub).
+			return m, nil
+		}
+		// 2+ activations: open activation picker.
+		m.pickerState = ps
+		m.mode = ModePicker
+		return m, nil
+
+	case KeyEsc:
+		m.repoPicker = nil
+		m.mode = ModeNormal
+
+	case KeyDown, "down":
+		if rp.cursorIdx < len(rp.rows)-1 {
+			m.repoPicker.cursorIdx++
+		}
+	case KeyUp, "up":
+		if rp.cursorIdx > 0 {
+			m.repoPicker.cursorIdx--
+		}
 	}
 	return m, nil
 }
