@@ -65,13 +65,16 @@ func (a *JiraAdapter) ListBoards(ctx context.Context) ([]tracker.BoardSummary, e
 	return boards, nil
 }
 
-// GetBoard fetches the board details.
-// Calls 'acli jira board get --id N --json'.
+// GetBoard fetches the board name from acli and merges it with the adapter's
+// locally-stored column layout.
 //
-// DEVIATION: acli 1.3.18 'board get --json' does not return column config or filterId.
-// The returned Board has no Columns. The board's column layout is not accessible via acli.
-// Users who need column layout must configure it manually in config.json or accept the
-// empty default (all tickets in a single unlabeled column).
+// Calls 'acli jira board get --id N --json' to get the board name.
+// Columns come from a.cfg.Columns (set at construction from config.json
+// adapter_config.columns). This avoids the acli limitation: acli 1.3.18
+// 'board get --json' does not return column config or filterId.
+//
+// If a.cfg.Columns is empty, the returned Board has no columns and all
+// tickets fall into the "Unmapped" column in the UI.
 func (a *JiraAdapter) GetBoard(ctx context.Context, boardID string) (tracker.Board, error) {
 	stdout, stderr, exitCode, err := a.runner(ctx, "jira", "board", "get", "--id", boardID, "--json")
 	if err != nil {
@@ -94,6 +97,6 @@ func (a *JiraAdapter) GetBoard(ctx context.Context, boardID string) (tracker.Boa
 	return tracker.Board{
 		ID:      fmt.Sprintf("%d", result.ID),
 		Name:    result.Name,
-		Columns: nil, // not available via acli board get
+		Columns: a.cfg.Columns, // manually-configured; empty slice means "all in Unmapped"
 	}, nil
 }
