@@ -12,4 +12,5 @@ const (
 	ModeHelp                  // help overlay
 	ModeFilter                // ticket filter input active
 	ModeShuttingDown          // terminal clean-up in progress
+	ModeRepoPicker            // repo picker overlay (first-touch or multi-repo disambiguation)
 )
