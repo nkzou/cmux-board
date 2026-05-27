@@ -104,16 +104,14 @@ func (m Model) handlePushOK(_ PushOKMsg) (Model, tea.Cmd) {
 func (m Model) handlePushConflict(msg PushConflictMsg) (Model, tea.Cmd) {
 	// TODO(T-065): call store.Mutate to snap ticket back to msg.ServerStatus.
 	// TODO(T-058): emit cmux pill update.
-	cmd := m.pushToast("conflict: " + msg.TicketID + " moved to " + msg.ServerStatus + " — snapped back")
-	return m, cmd
+	return m.pushToast("conflict: " + msg.TicketID + " moved to " + msg.ServerStatus + " — snapped back")
 }
 
 // handleActivationDone handles activation completion or error.
 func (m Model) handleActivationDone(msg activationDoneMsg) (Model, tea.Cmd) {
 	if msg.Err != nil {
-		cmd := m.pushToast(userFriendlyError(msg.Err))
 		// TODO(T-058): emit cmux/claude pill update for specific error types.
-		return m, cmd
+		return m.pushToast(userFriendlyError(msg.Err))
 	}
 	return m, nil
 }
