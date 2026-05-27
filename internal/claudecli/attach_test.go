@@ -10,9 +10,9 @@ func TestBuildAttachCommand_Format(t *testing.T) {
 		shortID string
 		want    string
 	}{
-		{"3174068b", "claude attach 3174068b"},
-		{"cafef00d", "claude attach cafef00d"},
-		{"00000000", "claude attach 00000000"},
+		{"3174068b", "CMUX_CLAUDE_HOOKS_DISABLED=1 claude attach 3174068b"},
+		{"cafef00d", "CMUX_CLAUDE_HOOKS_DISABLED=1 claude attach cafef00d"},
+		{"00000000", "CMUX_CLAUDE_HOOKS_DISABLED=1 claude attach 00000000"},
 	}
 	for _, c := range cases {
 		got := BuildAttachCommand(c.shortID)
@@ -46,7 +46,7 @@ func TestBuildAttachCommand_UsedInLayoutJSON(t *testing.T) {
 		t.Fatalf("json.Unmarshal: %v", err)
 	}
 
-	want := "claude attach abcd1234"
+	want := "CMUX_CLAUDE_HOOKS_DISABLED=1 claude attach abcd1234"
 	if decoded.Command != want {
 		t.Errorf("round-tripped Command = %q, want %q", decoded.Command, want)
 	}

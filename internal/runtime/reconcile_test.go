@@ -612,7 +612,7 @@ func resumeWithDeps(
 	}
 
 	if entry.Step == state.StepClaudeStarted {
-		agentCmd := "claude attach " + entry.ClaudeShortID
+		agentCmd := claudecli.BuildAttachCommand(entry.ClaudeShortID)
 		wsRef, err := deps.newWorkspace(ctx, cmuxcli.NewWorkspaceArgs{
 			Name:               entry.CmuxName,
 			CWD:                worktreeDir,
