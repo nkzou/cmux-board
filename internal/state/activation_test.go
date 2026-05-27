@@ -1,6 +1,14 @@
 package state
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
+
+func timePtr() *time.Time {
+	t := time.Now()
+	return &t
+}
 
 func makeActState(activations map[string][]ActivationEntry) *State {
 	if activations == nil {
@@ -153,5 +161,70 @@ func TestAllIncompleteActivations_NotNil(t *testing.T) {
 	got := AllIncompleteActivations(s)
 	if got == nil {
 		t.Error("expected non-nil empty slice")
+	}
+}
+
+func TestActivationCount(t *testing.T) {
+	now := timePtr()
+	cases := []struct {
+		name        string
+		activations map[string][]ActivationEntry
+		ticket      string
+		want        int
+	}{
+		{
+			name:        "no entries returns 0",
+			activations: nil,
+			ticket:      "PROJ-42",
+			want:        0,
+		},
+		{
+			name: "single active counts",
+			activations: map[string][]ActivationEntry{
+				"PROJ-42": {{ActivationID: "a1", RepoID: "r1"}},
+			},
+			ticket: "PROJ-42",
+			want:   1,
+		},
+		{
+			name: "multiple across repos all count",
+			activations: map[string][]ActivationEntry{
+				"PROJ-42": {
+					{ActivationID: "a1", RepoID: "r1"},
+					{ActivationID: "a2", RepoID: "r2"},
+				},
+			},
+			ticket: "PROJ-42",
+			want:   2,
+		},
+		{
+			name: "removed entries are excluded",
+			activations: map[string][]ActivationEntry{
+				"PROJ-42": {
+					{ActivationID: "a1", RepoID: "r1"},
+					{ActivationID: "a2", RepoID: "r2", RemovedAt: now},
+				},
+			},
+			ticket: "PROJ-42",
+			want:   1,
+		},
+		{
+			name: "other tickets do not bleed",
+			activations: map[string][]ActivationEntry{
+				"PROJ-42": {{ActivationID: "a1"}},
+				"PROJ-99": {{ActivationID: "b1"}, {ActivationID: "b2"}},
+			},
+			ticket: "PROJ-99",
+			want:   2,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := makeActState(tc.activations)
+			got := ActivationCount(s, tc.ticket)
+			if got != tc.want {
+				t.Errorf("ActivationCount(%q) = %d, want %d", tc.ticket, got, tc.want)
+			}
+		})
 	}
 }
