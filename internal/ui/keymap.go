@@ -67,7 +67,27 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.activeTicketIdx--
 		}
 	case KeyActivate:
-		// TODO(T-064): resolveRepoForActivation — emit tea.Cmd that calls activate.Activate.
+		// Determine current ticket.
+		colTickets := m.ticketsForActiveCol()
+		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+			return m, nil
+		}
+		ticketID := colTickets[m.activeTicketIdx].Key
+		assignedIDs := state.AssignedRepoIDs(m.snapshot, ticketID)
+
+		// TODO(T-064): full resolveRepoForActivation wiring replaces this stub.
+		// For now: if exactly 1 repo assigned, open picker or activate directly.
+		if len(assignedIDs) == 1 {
+			repoID := assignedIDs[0]
+			ps := newPickerState(m.snapshot, ticketID, repoID)
+			if ps == nil {
+				// 0 or 1 activations: activate directly (T-062) or focus (T-063).
+				// Both are B3 stubs.
+				return m, nil
+			}
+			m.pickerState = ps
+			m.mode = ModePicker
+		}
 		return m, nil
 	case KeyNewApproach:
 		// Capital N: new approach regardless of existing activations (F16).
@@ -98,11 +118,13 @@ func (m Model) handlePickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.mode = ModeNormal
 		return m, nil
 	}
+	ps := m.pickerState
 	switch msg.String() {
 	case KeyPickerFocus:
 		// TODO(T-063): call focus.Focus on selected activation.
 		return m, nil
 	case KeyPickerNew:
+		m.pickerState = nil
 		m.previousMode = ModePicker
 		m.mode = ModeApproachName
 		m.approachNameInput.SetValue("")
@@ -111,22 +133,41 @@ func (m Model) handlePickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		// TODO(T-063): respawn selected activation.
 		return m, nil
 	case KeyPickerDelete:
-		// Delete activation cache entry only — does NOT call any cmux or claude destructor.
-		// store.Mutate removes the entry from state.activations.
-		// TODO(T-057): implement delete via store.Mutate when activation is selected.
-		return m, nil
+		if len(ps.entries) == 0 {
+			return m, nil
+		}
+		entry := ps.entries[ps.cursorIdx]
+		activationID := entry.ActivationID
+		if err := m.store.Mutate(func(s *state.State) error {
+			return removeActivation(s, activationID)
+		}); err != nil {
+			return m.pushToast("delete failed: " + err.Error())
+		}
+		// Re-fetch from updated snapshot.
+		snap, rev := m.store.Snapshot()
+		m.snapshot = snap
+		m.snapshotRev = rev
+		newEntries := state.FindActivations(snap, ps.ticketID, ps.repoID)
+		if len(newEntries) == 0 {
+			m.pickerState = nil
+			m.mode = ModeNormal
+			return m, nil
+		}
+		m.pickerState = &pickerState{
+			ticketID:  ps.ticketID,
+			repoID:    ps.repoID,
+			entries:   newEntries,
+			cursorIdx: min(ps.cursorIdx, len(newEntries)-1),
+		}
 	case KeyPickerCancel: // == KeyEsc == "esc"
 		m.pickerState = nil
 		m.mode = ModeNormal
 	case KeyDown, "down":
-		// picker cursor movement; clamped by T-060 once activation list length is known.
-		if m.pickerState.cursorIdx < 0 {
-			m.pickerState.cursorIdx = 0
-		} else {
+		if ps.cursorIdx < len(ps.entries)-1 {
 			m.pickerState.cursorIdx++
 		}
 	case KeyUp, "up":
-		if m.pickerState.cursorIdx > 0 {
+		if ps.cursorIdx > 0 {
 			m.pickerState.cursorIdx--
 		}
 	}

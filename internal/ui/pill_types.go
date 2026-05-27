@@ -1,6 +1,10 @@
 package ui
 
-import "time"
+import (
+	"time"
+
+	"github.com/kevin-zou/cmux-board/internal/state"
+)
 
 // pillState tracks the last-emitted text and timestamp for debounce logic.
 // Used by emitPill in pills.go.
@@ -17,15 +21,18 @@ type toastEntry struct {
 
 // pickerState holds ephemeral view state for the activation picker overlay.
 // Initialized on transition into ModePicker; nil when the picker is closed.
-// TODO(T-060): full picker overlay implementation populates this struct.
 type pickerState struct {
-	cursorIdx int // selected row in the picker list
+	ticketID  string
+	repoID    string
+	entries   []state.ActivationEntry // snapshot of activations for this (ticket, repo)
+	cursorIdx int
 }
 
 // assignmentEditorState holds ephemeral view state for the repo assignment editor.
 // Initialized on transition into ModeAssignmentEditor; nil when the editor is closed.
-// TODO(T-061): full assignment editor implementation populates this struct.
 type assignmentEditorState struct {
-	cursorIdx int     // selected row in the repo list
-	selected  []bool  // parallel to cfg.Repos slice; true == repo is assigned
+	ticketID  string
+	repoIDs   []string        // ordered list of all repo IDs from cfg.Repos
+	checked   map[string]bool // current toggle state (pre-populated from state)
+	cursorIdx int
 }
