@@ -36,7 +36,7 @@ func TestListTicketsHappyPath(t *testing.T) {
 		{stdout: []byte(boardSearchForProject), exitCode: 0},
 		{stdout: []byte(workitemSearchJSON), exitCode: 0},
 	})
-	a := &JiraAdapter{creds: Credentials{Site: "test.atlassian.net"}, runner: runner}
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
 
 	tickets, err := a.ListTickets(context.Background(), "1", nil)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestListTicketsSinceFilter(t *testing.T) {
 		{stdout: []byte(boardSearchForProject), exitCode: 0},
 		{stdout: []byte(`[]`), exitCode: 0},
 	})
-	a := &JiraAdapter{creds: Credentials{Site: "test.atlassian.net"}, runner: runner}
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
 
 	since := time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
 	_, err := a.ListTickets(context.Background(), "1", &since)
@@ -108,7 +108,7 @@ func TestListTicketsAuthError(t *testing.T) {
 		[]byte("✗ Error: unauthorized: use 'acli jira auth login' to authenticate"),
 		0, nil,
 	)
-	a := &JiraAdapter{creds: Credentials{Site: "test.atlassian.net"}, runner: runner}
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
 
 	_, err := a.ListTickets(context.Background(), "1", nil)
 	if err == nil {
@@ -133,7 +133,7 @@ func TestListTicketsNullableFields(t *testing.T) {
 		{stdout: []byte(boardSearchForProject), exitCode: 0},
 		{stdout: []byte(nullableJSON), exitCode: 0},
 	})
-	a := &JiraAdapter{creds: Credentials{Site: "test.atlassian.net"}, runner: runner}
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
 
 	tickets, err := a.ListTickets(context.Background(), "1", nil)
 	if err != nil {
@@ -153,7 +153,7 @@ func TestListTicketsNullableFields(t *testing.T) {
 func TestListTicketsBoardNotFound(t *testing.T) {
 	// Board search returns no boards.
 	runner := fakeRunner([]byte(`{"isLast":true,"maxResults":50,"startAt":0,"total":0,"values":[]}`), nil, 0, nil)
-	a := &JiraAdapter{creds: Credentials{Site: "test.atlassian.net"}, runner: runner}
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
 
 	_, err := a.ListTickets(context.Background(), "999", nil)
 	if err == nil {

@@ -3,6 +3,8 @@ package jira
 import (
 	"context"
 	"testing"
+
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 const boardGetJSON = `{
@@ -27,9 +29,52 @@ func TestGetBoardHappyPath(t *testing.T) {
 	if board.Name != "My Project Board" {
 		t.Errorf("Name: got %q, want %q", board.Name, "My Project Board")
 	}
-	// Columns are not available via acli board get.
+	// No columns configured: returns nil (all tickets in Unmapped).
 	if board.Columns != nil {
-		t.Errorf("Columns: expected nil (not available via acli), got %v", board.Columns)
+		t.Errorf("Columns: expected nil when none configured, got %v", board.Columns)
+	}
+}
+
+func TestGetBoardReturnsStoredColumns(t *testing.T) {
+	storedCols := []tracker.Column{
+		{ID: "todo", Name: "To Do", StatusIDs: []string{"To Do", "Open"}},
+		{ID: "in-progress", Name: "In Progress", StatusIDs: []string{"In Progress"}},
+	}
+	runner := fakeRunner([]byte(boardGetJSON), nil, 0, nil)
+	a := &JiraAdapter{
+		runner: runner,
+		cfg:    Config{Columns: storedCols},
+	}
+
+	board, err := a.GetBoard(context.Background(), "42")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(board.Columns) != 2 {
+		t.Fatalf("want 2 columns from stored config, got %d", len(board.Columns))
+	}
+	if board.Columns[0].Name != "To Do" {
+		t.Errorf("Columns[0].Name: got %q, want %q", board.Columns[0].Name, "To Do")
+	}
+	if len(board.Columns[0].StatusIDs) != 2 {
+		t.Errorf("Columns[0].StatusIDs: got %v, want 2 entries", board.Columns[0].StatusIDs)
+	}
+}
+
+func TestGetBoardEmptyColumnsReturnsNilColumns(t *testing.T) {
+	runner := fakeRunner([]byte(boardGetJSON), nil, 0, nil)
+	a := &JiraAdapter{
+		runner: runner,
+		cfg:    Config{Columns: []tracker.Column{}},
+	}
+
+	board, err := a.GetBoard(context.Background(), "42")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Empty slice is falsy in terms of len; UI will put everything in Unmapped.
+	if len(board.Columns) != 0 {
+		t.Errorf("want 0 columns for empty config, got %d", len(board.Columns))
 	}
 }
 

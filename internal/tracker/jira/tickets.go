@@ -88,7 +88,7 @@ func (a *JiraAdapter) ListTickets(ctx context.Context, boardID string, since *ti
 
 	tickets := make([]tracker.Ticket, 0, len(issues))
 	for _, iss := range issues {
-		tickets = append(tickets, acliIssueToTicket(iss, a.creds.Site))
+		tickets = append(tickets, acliIssueToTicket(iss, a.cfg.Site))
 	}
 	return tickets, nil
 }
