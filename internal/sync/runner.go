@@ -21,6 +21,9 @@ type Poller struct {
 // NewPoller starts the background poll goroutine and returns a Poller that
 // can be used to wait for it to exit. The goroutine stops when ctx is cancelled.
 //
+// If tr is nil (e.g. during tests without a configured tracker), the goroutine
+// exits immediately and Wait always returns true.
+//
 // This is the preferred entry point for production code; the package-level
 // Start function is kept for backward compatibility.
 func NewPoller(
@@ -33,10 +36,10 @@ func NewPoller(
 	p := &Poller{done: make(chan struct{})}
 	go func() {
 		defer close(p.done)
-		// Delegate to the existing polling logic.  We wrap in a goroutine that
-		// closes done when Start's goroutine exits.  Because Start does not
-		// currently expose its goroutine's done signal, we reproduce its
-		// loop inline here to get proper lifetime control.
+		if tr == nil {
+			// No tracker configured — nothing to poll.
+			return
+		}
 		runPollLoop(ctx, cfg, tr, store, emitFn)
 	}()
 	return p

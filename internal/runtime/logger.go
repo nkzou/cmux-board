@@ -17,8 +17,14 @@ func NewLogger(level slog.Level) *slog.Logger {
 	return newLoggerWithWriter(level, os.Stderr)
 }
 
-// newLoggerWithWriter builds a logger writing to w through the secretsink.Writer
-// redaction layer. Used in tests to capture output via a bytes.Buffer.
+// NewLoggerWithWriter builds a logger writing to w through the secretsink.Writer
+// redaction layer. Used in tests to capture output via a bytes.Buffer and in
+// dock_cmd.go for log capture during testing.
+func NewLoggerWithWriter(level slog.Level, w io.Writer) *slog.Logger {
+	return newLoggerWithWriter(level, w)
+}
+
+// newLoggerWithWriter is the internal implementation.
 func newLoggerWithWriter(level slog.Level, w io.Writer) *slog.Logger {
 	// Codex Finding 7: construct the handler around secretsink.Writer(w), never
 	// directly around w. Redaction happens at the io.Writer stage so it applies
