@@ -45,13 +45,21 @@ type acliPriority struct {
 // locationProjectKeyRe extracts the project key from the location string "Name (KEY)".
 var locationProjectKeyRe = regexp.MustCompile(`\(([A-Z][A-Z0-9_]+)\)\s*$`)
 
+// listTicketsWindow is the maximum lookback for ticket search. Tickets older than
+// this window are never fetched, regardless of poll cadence — they're effectively
+// archived from the board's perspective.
+const listTicketsWindow = 3 * 30 * 24 * time.Hour // ~3 calendar months
+
 // ListTickets fetches all tickets for a board using JQL.
 // Calls 'acli jira workitem search --json --paginate --jql "..."'.
+//
+// JQL always includes 'updated >= <cutoff>' where cutoff is the more recent of
+// (since) and (now - 3 months). The 3-month floor keeps the result set bounded
+// against long-lived projects with thousands of historical tickets.
 //
 // DEVIATION from brief: acli 'board get' does not expose a filterId, so we cannot
 // use '--filter N'. Instead, the board's project key is resolved via 'board search'
 // (location field contains "ProjectName (KEY)"), and JQL filters by project.
-// If since is non-nil, adds 'AND updated >= "..."' to the JQL.
 //
 // DEVIATION: acli 1.3.18 workitem search JSON returns only 5 fields (assignee,
 // issuetype, priority, status, summary). Labels and UpdatedAt are always empty.
@@ -62,11 +70,12 @@ func (a *JiraAdapter) ListTickets(ctx context.Context, boardID string, since *ti
 		return nil, fmt.Errorf("ListTickets: %w", err)
 	}
 
-	jql := fmt.Sprintf("project = %s ORDER BY updated DESC", projectKey)
-	if since != nil {
-		jql = fmt.Sprintf("project = %s AND updated >= %q ORDER BY updated DESC",
-			projectKey, since.UTC().Format("2006-01-02 15:04"))
+	cutoff := time.Now().Add(-listTicketsWindow)
+	if since != nil && since.After(cutoff) {
+		cutoff = *since
 	}
+	jql := fmt.Sprintf("project = %s AND updated >= %q ORDER BY updated DESC",
+		projectKey, cutoff.UTC().Format("2006-01-02 15:04"))
 
 	stdout, stderr, exitCode, err := a.runner(ctx,
 		"jira", "workitem", "search",
