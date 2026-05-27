@@ -144,7 +144,7 @@ func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
 
 	// 2. Build adapter — site from flag or resolved from acli auth status.
 	// ProbeACLI will determine the site by calling WhoAmI (acli auth status).
-	adapter := jira.NewJiraAdapter(jira.Credentials{
+	adapter := jira.NewJiraAdapter(jira.Config{
 		Site: siteFlag,
 	})
 
@@ -166,13 +166,26 @@ func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
 		return fmt.Errorf("board pick: %w", err)
 	}
 
-	// 5. Repo registration (interactive loop or --repo override).
+	// 5. Column configuration: discover statuses and let the user define columns.
+	trackerCols, err := initwizard.ConfigureColumns(ctx, stdout, stdin, adapter, board.ID)
+	if err != nil {
+		return fmt.Errorf("column configuration: %w", err)
+	}
+	columns := make([]config.ColumnConfig, len(trackerCols))
+	for i, c := range trackerCols {
+		columns[i] = config.ColumnConfig{
+			Name:     c.Name,
+			Statuses: c.StatusIDs,
+		}
+	}
+
+	// 6. Repo registration (interactive loop or --repo override).
 	repos, err := initwizard.RegisterRepos(ctx, stdout, stdin, repoFlag, nil, nil)
 	if err != nil {
 		return fmt.Errorf("repos: %w", err)
 	}
 
-	// 6. Finalize: confirmation prompt, write three files atomically, print Dock snippet.
+	// 7. Finalize: confirmation prompt, write three files atomically, print Dock snippet.
 	input := initwizard.WizardInput{
 		Adapter:         "jira",
 		Site:            site,
@@ -183,6 +196,7 @@ func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
 		DefaultApproach: "main",
 		Repos:           repos,
 		UserID:          identity.ID,
+		Columns:         columns,
 	}
 	return initwizard.Finalize(ctx, stdout, stdin, input, configDir)
 }

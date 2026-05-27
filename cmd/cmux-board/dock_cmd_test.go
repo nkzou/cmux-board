@@ -109,7 +109,7 @@ func immediateExitProgram() func(context.Context, *config.Config, *state.Store, 
 func noOpReconcile(_ context.Context, _ *state.Store, _ *config.Config) error { return nil }
 
 // noOpNewTracker returns a nil tracker.
-func noOpNewTracker(_ config.Credentials) tracker.IssueTracker { return nil }
+func noOpNewTracker(_ config.Config, _ config.Credentials) tracker.IssueTracker { return nil }
 
 // newLoggerCapturing returns a newLogger dep that writes to buf.
 func newLoggerCapturing(buf *bytes.Buffer) func(slog.Level, io.Writer) *slog.Logger {

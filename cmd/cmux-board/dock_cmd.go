@@ -53,8 +53,8 @@ type dockDeps struct {
 	// checkACLI verifies acli is installed and authenticated before starting.
 	// Returns an error with an actionable message if acli is absent or unauthenticated.
 	checkACLI func(ctx context.Context) error
-	// newTracker constructs the issue tracker from credentials.
-	newTracker func(creds config.Credentials) tracker.IssueTracker
+	// newTracker constructs the issue tracker from config and credentials.
+	newTracker func(cfg config.Config, creds config.Credentials) tracker.IssueTracker
 	// runProgram runs the BubbleTea program and returns when the user quits.
 	// resultCh, when non-nil, is drained and forwarded to the program via Send.
 	// Production passes bridge.ResultCh; tests pass nil (no-op).
@@ -80,13 +80,24 @@ func prodDockDeps() dockDeps {
 			return runtime.ReconcileIncompleteActivations(ctx, store, cfg)
 		},
 		checkACLI: checkACLIPreflight,
-		newTracker: func(creds config.Credentials) tracker.IssueTracker {
+		newTracker: func(cfg config.Config, creds config.Credentials) tracker.IssueTracker {
 			jiraCreds, ok := creds.Adapters["jira"]
 			if !ok {
 				return nil
 			}
-			return jira.NewJiraAdapter(jira.Credentials{
-				Site: jiraCreds.SiteURL,
+			// Parse manually-configured columns from adapter_config.columns.
+			cfgCols := config.ParseAdapterColumns(cfg.AdapterConfig)
+			trackerCols := make([]tracker.Column, len(cfgCols))
+			for i, c := range cfgCols {
+				trackerCols[i] = tracker.Column{
+					ID:        c.Name, // use name as ID; Resolve compares case-insensitively
+					Name:      c.Name,
+					StatusIDs: c.Statuses,
+				}
+			}
+			return jira.NewJiraAdapter(jira.Config{
+				Site:    jiraCreds.SiteURL,
+				Columns: trackerCols,
 			})
 		},
 		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error {
@@ -191,7 +202,7 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 	}
 
 	// Construct the tracker adapter.
-	tr := deps.newTracker(creds)
+	tr := deps.newTracker(cfg, creds)
 
 	// Step 8: Create bridge and start sync.Poller + push worker.
 	// bridge.ResultCh is drained inside runProgram via prog.Send.
