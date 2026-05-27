@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -25,10 +24,16 @@ type renderBoardParams struct {
 	activeTicket   int
 	hoverTicket    int
 	sidebarFocused bool
+	spinnerGlyph   string
 }
 
 // renderBoard renders the kanban board given the provided parameters.
 // It handles scroll indicators, column rendering, and active/hover states.
+//
+// All configured columns are sized to fit within p.width. Columns share the
+// available width evenly and shrink as needed — the previous behaviour clipped
+// columns past width/22 behind ◀ ▶ indicators, which hid most of the board on
+// the narrow Dock sidebar.
 func renderBoard(p renderBoardParams) string {
 	if len(p.columns) == 0 {
 		return lipgloss.NewStyle().
@@ -36,33 +41,23 @@ func renderBoard(p renderBoardParams) string {
 			Render("No columns configured.")
 	}
 
-	// Compute visible columns based on available width.
-	const minColumnWidth = 20
-	maxVisible := p.width / (minColumnWidth + 2)
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
-
-	startCol := p.scrollOffset
-	endCol := min(startCol+maxVisible, len(p.columns))
-
+	startCol := 0
+	endCol := len(p.columns)
 	numVisible := endCol - startCol
-	baseWidth := p.width / numVisible
-	if baseWidth < minColumnWidth {
-		baseWidth = minColumnWidth
+
+	// Account for the 1-cell right margin between adjacent columns. The last
+	// column has no margin, so total margin overhead is (numVisible-1).
+	available := p.width - (numVisible - 1)
+	if available < numVisible {
+		available = numVisible // at least 1 cell per column
 	}
-	remainder := p.width - baseWidth*numVisible
+	baseWidth := available / numVisible
+	if baseWidth < 1 {
+		baseWidth = 1
+	}
+	remainder := available - baseWidth*numVisible
 
 	var columns []string
-
-	if startCol > 0 {
-		indicator := lipgloss.NewStyle().
-			Foreground(p.colors.muted).
-			Background(p.colors.surface).
-			Padding(0, 1).
-			Render(fmt.Sprintf("◀ %d", startCol))
-		columns = append(columns, indicator)
-	}
 
 	for i := startCol; i < endCol; i++ {
 		col := p.columns[i]
@@ -86,28 +81,19 @@ func renderBoard(p renderBoardParams) string {
 		}
 
 		columns = append(columns, renderColumn(renderColumnParams{
-			col:              col,
-			tickets:          tickets,
-			isActive:         isActive,
-			isDragTarget:     isDragTarget,
-			isHovered:        isHovered,
-			width:            colWidth,
-			isLast:           isLast,
-			ticketOffset:     ticketOffset,
-			activeTicket:     p.activeTicket,
-			hoverTicket:      p.hoverTicket,
-			colors:           p.colors,
+			col:          col,
+			tickets:      tickets,
+			isActive:     isActive,
+			isDragTarget: isDragTarget,
+			isHovered:    isHovered,
+			width:        colWidth,
+			isLast:       isLast,
+			ticketOffset: ticketOffset,
+			activeTicket: p.activeTicket,
+			hoverTicket:  p.hoverTicket,
+			colors:       p.colors,
+			spinnerGlyph: p.spinnerGlyph,
 		}))
-	}
-
-	if endCol < len(p.columns) {
-		remaining := len(p.columns) - endCol
-		indicator := lipgloss.NewStyle().
-			Foreground(p.colors.muted).
-			Background(p.colors.surface).
-			Padding(0, 1).
-			Render(fmt.Sprintf("%d ▶", remaining))
-		columns = append(columns, indicator)
 	}
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, columns...)

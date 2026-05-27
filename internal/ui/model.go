@@ -66,6 +66,14 @@ type Model struct {
 	// Toast queue
 	toasts []toastEntry
 
+	// Activation in-flight tracking. Key is ticketID; presence means an activation
+	// is currently running for that ticket and a second one must be blocked.
+	// spinnerFrame is advanced by spinnerTickMsg to animate the indicator on
+	// activating tickets. The tick is only armed while activatingTickets is
+	// non-empty; otherwise it stays at 0.
+	activatingTickets map[string]bool
+	spinnerFrame      int
+
 	// Poll failure state (for backoff display)
 	pollFailedAt *time.Time
 	pollErrCode  string

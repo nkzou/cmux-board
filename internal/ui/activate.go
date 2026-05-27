@@ -146,31 +146,6 @@ func activate(
 		return state.ActivationEntry{}, ErrRepoNotRegistered{RepoID: repoID}
 	}
 
-	// 0b. Render starter prompt.
-	snap, _ := store.Snapshot()
-	var ticketForPrompt tracker.Ticket
-	if ts, ok := snap.Tickets[ticketID]; ok {
-		ticketForPrompt = tracker.Ticket{
-			Key:     ts.Key,
-			Summary: ts.Summary,
-			Status:  ts.Status,
-			URL:     ts.URL,
-		}
-	}
-	promptData := claudecli.PromptData{
-		Ticket:       ticketForPrompt,
-		Repo:         repo,
-		ApproachName: approach,
-	}
-	tmpl := cfg.Claude.StarterPrompt
-	if tmpl == "" {
-		tmpl = config.DefaultStarterPromptTemplate
-	}
-	prompt, err := claudecli.RenderPrompt(tmpl, promptData)
-	if err != nil {
-		return state.ActivationEntry{}, fmt.Errorf("failed to render starter prompt: %w", err)
-	}
-
 	// 1. Generate activation_id (ULID) BEFORE any side effect.
 	actID := ulid.Make()
 	actIDShort := strings.ToLower(actID.String())[:8] // 8-char Crockford-base32, NOT hex
@@ -197,6 +172,33 @@ func activate(
 		// claude_name and cmux_name do NOT receive the suffix (reconciliation
 		// matches by act_id_short substring alone, not by suffix).
 		branchName = branchName + suffix
+	}
+
+	// 3b. Render starter prompt AFTER finalPath is known so {{.WorktreePath}}
+	// expands to the actual on-disk path rather than an empty string.
+	snap, _ := store.Snapshot()
+	var ticketForPrompt tracker.Ticket
+	if ts, ok := snap.Tickets[ticketID]; ok {
+		ticketForPrompt = tracker.Ticket{
+			Key:     ts.Key,
+			Summary: ts.Summary,
+			Status:  ts.Status,
+			URL:     ts.URL,
+		}
+	}
+	promptData := claudecli.PromptData{
+		Ticket:       ticketForPrompt,
+		Repo:         repo,
+		WorktreePath: finalPath,
+		ApproachName: approach,
+	}
+	tmpl := cfg.Claude.StarterPrompt
+	if tmpl == "" {
+		tmpl = config.DefaultStarterPromptTemplate
+	}
+	prompt, err := claudecli.RenderPrompt(tmpl, promptData)
+	if err != nil {
+		return state.ActivationEntry{}, fmt.Errorf("failed to render starter prompt: %w", err)
 	}
 
 	// 4. Journal entry BEFORE any side effect.
@@ -277,7 +279,7 @@ func activate(
 
 	// 7. Side effect 3: create cmux workspace.
 	callHook(hook(deps.hooks, func(h *ActivationHooks) func() { return h.BeforeCmux }))
-	agentCmd := "claude attach " + bgResult.ShortID
+	agentCmd := claudecli.BuildAttachCommand(bgResult.ShortID)
 	wsRef, err := deps.newWorkspace(ctx, cmuxcli.NewWorkspaceArgs{
 		Name:               cmuxName,
 		CWD:                worktreeDir,
@@ -356,6 +358,10 @@ func ActivateCmd(
 		if err == nil {
 			activationID = entry.ActivationID
 		}
-		return activationDoneMsg{ActivationID: activationID, Err: err}
+		return activationDoneMsg{
+			TicketID:     ticketID,
+			ActivationID: activationID,
+			Err:          err,
+		}
 	}
 }

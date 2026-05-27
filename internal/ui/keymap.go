@@ -86,7 +86,7 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			activations := state.FindActivations(m.snapshot, ticketID, repoID)
 			if len(activations) == 0 {
 				// 0 activations → activate with empty approach name.
-				return m, ActivateCmd(m.ctx, m.store, m.cfg, ticketID, repoID, "")
+				return m.tryActivate(ticketID, repoID, "")
 			}
 			// 1 activation → focus directly (T-063).
 			return m.focusActivation(activations[0])
@@ -220,7 +220,7 @@ func (m Model) handleApproachNameMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			repoID = res.RepoID
 		}
 		m.previousMode = ModeNormal
-		return m, ActivateCmd(m.ctx, m.store, m.cfg, ticketID, repoID, name)
+		return m.tryActivate(ticketID, repoID, name)
 	case KeyApproachCancel:
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Blur()
@@ -325,7 +325,7 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if ps == nil {
 			activations := state.FindActivations(m.snapshot, ticketID, chosenID)
 			if len(activations) == 0 {
-				return m, ActivateCmd(m.ctx, m.store, m.cfg, ticketID, chosenID, "")
+				return m.tryActivate(ticketID, chosenID, "")
 			}
 			// 1 activation → focus directly (T-063).
 			return m.focusActivation(activations[0])

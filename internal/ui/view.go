@@ -152,6 +152,7 @@ func (m Model) renderModelBoard(colors uiColors) string {
 		columnTickets: colTickets,
 		columnOffsets: make([]int, len(cols)),
 		activeTicket:  m.activeTicketIdx,
+		spinnerGlyph:  m.spinnerGlyph(),
 	}
 	return renderBoard(p)
 }
@@ -174,7 +175,7 @@ func (m Model) buildFilteredTicketMap() map[string][]Ticket {
 					continue
 				}
 			}
-			result[colID] = append(result[colID], ticketStateToUI(t))
+			result[colID] = append(result[colID], ticketStateToUI(t, m.activatingTickets[t.Key]))
 		}
 	}
 	return result
@@ -184,20 +185,23 @@ func (m Model) buildFilteredTicketMap() map[string][]Ticket {
 func (m Model) buildUnmappedTickets() []Ticket {
 	out := make([]Ticket, 0, len(m.unmappedTickets))
 	for _, t := range m.unmappedTickets {
-		out = append(out, ticketStateToUI(t))
+		out = append(out, ticketStateToUI(t, m.activatingTickets[t.Key]))
 	}
 	return out
 }
 
 // ticketStateToUI converts a state.TicketState to the placeholder Ticket type.
-func ticketStateToUI(t state.TicketState) Ticket {
+// isActivating reflects whether an Activate goroutine is currently running for
+// this ticket; the UI uses it to draw the spinner badge.
+func ticketStateToUI(t state.TicketState, isActivating bool) Ticket {
 	return Ticket{
-		Key:      t.Key,
-		Summary:  t.Summary,
-		Status:   t.Status,
-		Labels:   t.Labels,
-		Priority: t.Priority,
-		URL:      t.URL,
+		Key:          t.Key,
+		Summary:      t.Summary,
+		Status:       t.Status,
+		Labels:       t.Labels,
+		Priority:     t.Priority,
+		URL:          t.URL,
+		IsActivating: isActivating,
 	}
 }
 
