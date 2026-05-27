@@ -35,7 +35,7 @@ One row per criterion. Status: **covered** = at least one passing test exercises
 | F-MR4 | Picker key `a` opens assignment editor; toggle + commit updates state atomically | `internal/ui/assignment_editor_test.go` `internal/ui/view_test.go` | `TestHandleAssignmentEditor_CommitAtomic` `TestHandleAssignmentEditor_CommitWritesStore` `TestView_AssignmentEditorOverlay` | covered |
 | F-MR5 | `repos remove` refuses if ticket has id in assigned_repo_ids or any activation references it | `cmd/cmux-board/repos_remove_test.go` `internal/config/repos_test.go` | `TestReposRemoveCmd_RefusedTicketAssignment` `TestReposRemoveCmd_RefusedActivation` `TestRemoveRepo_RefusedByTicketAssignment` `TestRemoveRepo_RefusedByActivation` | covered |
 | F-DR1 | `config.DryRun: true` short-circuits Push; no TransitionStatus call; state unchanged | `internal/sync/push_test.go` | `TestPush_DryRun_NoTrackerCall` `TestPush_DryRun_NoStateMutation` `TestPush_DryRun_ServerStatusEqualsExpectedFrom` `TestPush_DryRun_UnknownTicketStillErrors` | covered |
-| F-CLEAN | Repo presents as clean cmux-board project; zero OpenKanban references | — | — | deferred to M-012 (T-087 covers README/AGENTS/CLAUDE.md; full grep gate is M-012 scope) |
+| F-CLEAN | Repo presents as clean cmux-board project; zero legacy brand references | — | scripts/check_additive_only.sh arm 8 | covered (M-012: T-087 rewrote README/AGENTS/CLAUDE; T-091/T-092 scrubbed docs + infra; T-090b added grep gate) |
 
 ## Edge Case Criteria
 

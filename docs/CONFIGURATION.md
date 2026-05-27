@@ -1,338 +1,124 @@
-# Configuration Guide
+# Configuration
 
-OpenKanban configuration lives in `~/.config/openkanban/config.json`.
+cmux-board stores all config and state under `~/.config/cmux-board/`.
 
-## Default Configuration
+## File layout
+
+```
+~/.config/cmux-board/
+  config.json        mode 0644 -- user preferences and repo registry
+  state.json         mode 0644 -- ticket cache, activations, board snapshot
+  credentials.json   mode 0600 -- API tokens (mode enforced; refused if != 0600)
+```
+
+The binary refuses to start if `credentials.json` has permissions other than 0600.
+
+Schema v1 is refused on read. Both config.json and state.json must be schema_version 2.
+Run `cmux-board init` to generate a seed config.
+
+## config.json
+
+Authoritative schema: `internal/config/config.go`.
 
 ```json
 {
-  "defaults": {
-    "default_agent": "opencode",
-    "branch_prefix": "task/",
-    "branch_naming": "template",
-    "branch_template": "{prefix}{slug}",
-    "slug_max_length": 40,
-    "auto_spawn_agent": true,
-    "auto_create_branch": true
+  "schema_version": 2,
+  "adapter": "jira",
+  "adapter_config": {
+    "site_url": "https://yourorg.atlassian.net",
+    "board_id": "42"
   },
-  "agents": {
-    "opencode": {
-      "command": "opencode",
-      "args": [],
-      "status_file": ".opencode/status.json"
-    },
-    "claude": {
-      "command": "claude",
-      "args": ["--dangerously-skip-permissions"],
-      "status_file": ".claude/status.json"
-    },
-    "gemini": {
-      "command": "gemini",
-      "args": ["--yolo"]
-    },
-    "codex": {
-      "command": "codex",
-      "args": ["--full-auto"]
-    },
-    "aider": {
-      "command": "aider",
-      "args": ["--yes"]
+  "board_id": "42",
+  "repos": {
+    "my-service": {
+      "id": "my-service",
+      "name": "my-service",
+      "path": "/home/user/code/my-service",
+      "default_branch": "main"
     }
   },
-  "ui": {
-    "theme": "catppuccin-mocha",
-    "show_agent_status": true,
-    "refresh_interval": 5,
-    "column_width": 40,
-    "ticket_height": 4,
-    "sidebar_visible": true,
-    "scrollback_lines": 10000
+  "poll_interval_seconds": 60,
+  "worktree_base_dir": "/home/user/worktrees",
+  "claude": {
+    "model": "claude-opus-4-5",
+    "permission_mode": "bypassPermissions",
+    "starter_prompt": ""
   },
-  "cleanup": {
-    "delete_worktree": true,
-    "delete_branch": false,
-    "force_worktree_removal": false
-  },
-  "behavior": {
-    "confirm_quit_with_agents": true
-  },
-  "opencode": {
-    "server_enabled": true,
-    "server_port": 4096,
-    "poll_interval": 1,
-    "startup_timeout": 10
-  }
+  "dry_run": false
 }
 ```
 
-## Agents
+When `dry_run` is true, the binary skips all `TransitionStatus` calls to the tracker.
+The poller continues to read tickets normally. Card-move attempts return a non-modal
+toast and snap the card back to its prior column.
 
-Define any CLI-based agent. The command runs in the ticket's worktree directory.
+## state.json
+
+Authoritative schema: `internal/state/state.go`.
 
 ```json
 {
-  "agents": {
-    "my-agent": {
-      "command": "my-agent-cli",
-      "args": ["--flag", "value"],
-      "env": {
-        "CUSTOM_VAR": "value"
-      },
-      "init_prompt": "Custom prompt template with {{.Title}} and {{.Description}}"
+  "schema_version": 2,
+  "tickets": {
+    "PROJ-42": {
+      "key": "PROJ-42",
+      "summary": "Fix login bug",
+      "status": "In Progress",
+      "last_known_status": "To Do",
+      "assigned_repo_ids": ["my-service"],
+      "removed_at": null
     }
+  },
+  "activations": {
+    "PROJ-42": [
+      {
+        "activation_id": "01JXXXXXXXXXXXXXXXXXXXXXXXX",
+        "act_id_short": "0abc1234",
+        "repo_id": "my-service",
+        "ticket_id": "PROJ-42",
+        "approach_name": "main",
+        "worktree_path": "/home/user/worktrees/my-service-PROJ-42-main-0abc1234",
+        "branch_name": "proj-42-main-0abc1234",
+        "claude_name": "cmux-board:PROJ-42:0abc1234",
+        "cmux_name": "PROJ-42 [0abc1234]",
+        "step": "cmux_created",
+        "complete": true,
+        "created_at": "2026-01-01T00:00:00Z"
+      }
+    ]
   }
 }
 ```
 
-### Init Prompt Variables
+`activation_id` is a full ULID. `act_id_short` is the first 8 Crockford-base32
+characters of the ULID, lowercased. The step field tracks journal progress:
+`started` -> `worktree_created` -> `claude_started` -> `cmux_created`.
 
-When spawning an agent, OpenKanban can inject ticket context:
+`removed_at` on a ticket is set when the ticket leaves the polled set but is kept
+in state for historical resolution of activations.
 
-- `{{.Title}}` - Ticket title
-- `{{.Description}}` - Ticket description
-- `{{.BranchName}}` - Git branch name
-- `{{.BaseBranch}}` - Base branch (e.g., main)
+## credentials.json
 
-## Branch Naming
-
-Control how branches are named:
+Authoritative schema: `internal/config/credentials.go`.
 
 ```json
 {
-  "defaults": {
-    "branch_prefix": "feature/",
-    "branch_template": "{prefix}{slug}",
-    "slug_max_length": 30
-  }
-}
-```
-
-A ticket titled "Add user authentication" becomes branch `feature/add-user-authentication`.
-
-## Cleanup Behavior
-
-When deleting tickets:
-
-```json
-{
-  "cleanup": {
-    "delete_worktree": true,
-    "delete_branch": false,
-    "force_worktree_removal": false
-  }
-}
-```
-
-- `delete_worktree` - Remove the git worktree directory
-- `delete_branch` - Also delete the git branch
-- `force_worktree_removal` - Force removal even with uncommitted changes
-
-## Behavior
-
-Application behavior preferences:
-
-```json
-{
-  "behavior": {
-    "confirm_quit_with_agents": true
-  }
-}
-```
-
-- `confirm_quit_with_agents` - Prompt before quitting when agents are running (default: true). Set to false to auto-close agents without confirmation.
-
-## UI
-
-Display preferences:
-
-```json
-{
-  "ui": {
-    "sidebar_visible": true,
-    "scrollback_lines": 10000
-  }
-}
-```
-
-- `sidebar_visible` - Show project sidebar on startup (default: true). Toggle with `[` key during use.
-- `scrollback_lines` - Number of lines to keep in terminal scrollback buffer (default: 10000). The scrollback buffer stores terminal output that has scrolled off-screen, allowing you to scroll back through agent history with mouse wheel or Shift+PgUp/PgDn.
-
-## Themes
-
-OpenKanban supports multiple color themes. Set the theme in your config:
-
-```json
-{
-  "ui": {
-    "theme": "tokyo-night"
-  }
-}
-```
-
-### Available Themes
-
-**Dark themes:**
-- `catppuccin-mocha` (default) - Warm dark theme
-- `catppuccin-macchiato` - Slightly lighter Catppuccin
-- `catppuccin-frappe` - Medium Catppuccin
-- `tokyo-night` - Cool blue dark theme
-- `tokyo-night-storm` - Darker Tokyo Night variant
-- `gruvbox-dark` - Retro warm dark theme
-- `nord` - Arctic blue theme
-- `dracula` - Purple-accented dark theme
-- `one-dark` - Atom-inspired theme
-- `solarized-dark` - Classic low-contrast dark
-- `rose-pine` - Muted warm dark theme
-- `rose-pine-moon` - Lighter Rose Pine
-- `kanagawa` - Japanese-inspired theme
-- `everforest-dark` - Nature-inspired dark
-
-**Light themes:**
-- `catppuccin-latte` - Light Catppuccin
-- `tokyo-night-light` - Light Tokyo Night
-- `gruvbox-light` - Retro warm light theme
-- `solarized-light` - Classic low-contrast light
-- `rose-pine-dawn` - Light Rose Pine
-- `everforest-light` - Nature-inspired light
-
-### Custom Colors
-
-Override specific colors while using a base theme:
-
-```json
-{
-  "ui": {
-    "theme": "catppuccin-mocha",
-    "custom_colors": {
-      "primary": "#7aa2f7",
-      "success": "#9ece6a"
+  "schema_version": 2,
+  "adapters": {
+    "jira": {
+      "email": "user@example.com",
+      "api_token": "ATATT...",
+      "site_url": "https://yourorg.atlassian.net"
     }
   }
 }
 ```
 
-Available color fields:
+The raw `api_token` string is the only value registered with `secretsink.Register`.
+The email field is not registered. `secretsink` redacts registered values from all
+log output before any bytes reach disk or stdout.
 
-**Backgrounds:** `base`, `surface`, `overlay`
+## Init wizard
 
-**Text:** `text`, `subtext`, `muted`
-
-**Semantic accents:**
-- `primary` - Main accent (focus, selection, backlog column)
-- `secondary` - Secondary accent (special highlights)
-- `success` - Positive states (done column, confirmations)
-- `warning` - Caution states (in-progress column)
-- `error` - Errors and destructive actions
-- `info` - Informational elements
-
-## OpenCode Integration
-
-OpenKanban has deep integration with OpenCode. When enabled, it starts an OpenCode server and connects ticket terminals to it for accurate status detection.
-
-```json
-{
-  "opencode": {
-    "server_enabled": true,
-    "server_port": 4096,
-    "poll_interval": 1,
-    "startup_timeout": 10
-  }
-}
-```
-
-- `server_enabled` - Start OpenCode server for enhanced status detection (default: true). When enabled, ticket terminals use `opencode attach` to connect to the shared server.
-- `server_port` - Port for the OpenCode server (default: 4096). If a server is already running on this port, OpenKanban will reuse it.
-- `poll_interval` - Agent status polling interval in seconds (default: 1).
-- `startup_timeout` - Timeout in seconds for OpenCode server to become ready (default: 10).
-
-When `server_enabled` is false, OpenCode runs in standalone mode per-ticket with basic status detection.
-
-## Claude Code Integration
-
-When using Claude Code with the [oh-my-claude](https://github.com/TechDufus/oh-my-claude) plugin, OpenKanban automatically receives live status updates. No configuration required.
-
-**How it works:** OpenKanban sets `OPENKANBAN_SESSION` in agent terminals. oh-my-claude detects this and writes status to `~/.cache/openkanban-status/`. Status updates appear in real-time on your ticket cards.
-
-| Status | Meaning |
-|--------|---------|
-| `idle` | Ready for input |
-| `working` | Processing prompt or tools |
-| `waiting` | Awaiting user permission |
-
-To enable: Install [oh-my-claude](https://github.com/TechDufus/oh-my-claude) in Claude Code. That's it.
-
-## In-App Settings
-
-Press `O` to open the settings menu. You can configure these options without editing the config file:
-
-| Setting | Description |
-|---------|-------------|
-| Theme | Color theme (use j/k to navigate, live preview) |
-| Default Agent | Which agent to spawn (opencode, claude, gemini, codex, aider) |
-| Confirm Quit | Prompt before quitting with running agents |
-| Branch Prefix | Prefix for auto-generated branch names |
-| Delete Worktree | Remove git worktree when deleting tickets |
-| Delete Branch | Delete git branch when deleting tickets |
-| Force Cleanup | Force worktree removal even with uncommitted changes |
-| Show Sidebar | Toggle project sidebar visibility |
-| Filter Project | Show only tickets from a specific project |
-
-Changes are saved immediately to `~/.config/openkanban/config.json`.
-
-## Ticket Labels and Priority
-
-Tickets support labels and priority levels:
-
-**Labels**: Comma-separated tags (e.g., `bug, urgent, frontend`). Labels appear on ticket cards and can help organize work.
-
-**Priority**: 1 (Critical) to 5 (Lowest). High-priority tickets (1-2) show a visual indicator on the card:
-- `!!` - Critical (priority 1)
-- `!` - High (priority 2)
-
-Set labels and priority when creating or editing a ticket (`n` or `e`).
-
-## Keybindings
-
-All keybindings are shown in-app with `?`. Custom keybindings coming soon.
-
-## Full Keybindings Reference
-
-### Board View
-
-| Key | Action |
-|-----|--------|
-| `j/k` | Move cursor up/down |
-| `h/l` | Move between columns |
-| `g` | Go to first ticket |
-| `G` | Go to last ticket |
-| `space` | Move ticket to next column |
-| `-` | Move ticket to previous column |
-| `enter` | Attach to running agent |
-| `n` | Create new ticket |
-| `e` | Edit ticket |
-| `s` | Spawn agent for ticket |
-| `S` | Stop agent |
-| `d` | Delete ticket |
-| `/` | Search/filter tickets |
-| `esc` | Clear filter |
-| `tab` | Toggle sidebar focus |
-| `[` | Toggle sidebar visibility |
-| `O` | Open settings |
-| `?` | Show help |
-| `q` | Quit |
-
-### Sidebar
-
-| Key | Action |
-|-----|--------|
-| `h` | Focus sidebar (from column 0) |
-| `l` | Return to board |
-| `j/k` | Navigate projects |
-| `enter` | Select project filter |
-
-### Agent View
-
-| Key | Action |
-|-----|--------|
-| `ctrl+g` | Return to board |
-| All other keys | Passed to agent |
+`cmux-board init` writes a seed `config.json` and `credentials.json` interactively.
+It does not overwrite existing files unless `--force-reset` is passed.
