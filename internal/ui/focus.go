@@ -99,7 +99,7 @@ func Focus(
 		}
 
 		// Create NEW workspace (additive-only).
-		agentCmd := "claude attach " + activation.ClaudeShortID
+		agentCmd := claudecli.BuildAttachCommand(activation.ClaudeShortID)
 		wsRef, err := cmuxClient.NewWorkspaceWithLayout(ctx, cmuxcli.NewWorkspaceArgs{
 			Name:               activation.CmuxName,
 			CWD:                activation.WorktreePath,
