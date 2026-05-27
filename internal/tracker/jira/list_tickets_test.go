@@ -127,6 +127,24 @@ func TestListTicketsThreeMonthFloorWhenSinceNil(t *testing.T) {
 	}
 }
 
+func TestListTicketsFiltersByCurrentUser(t *testing.T) {
+	var allArgs [][]string
+	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
+		{stdout: []byte(boardGetForProject), exitCode: 0},
+		{stdout: []byte(`[]`), exitCode: 0},
+	})
+	a := &JiraAdapter{cfg: Config{Site: "test.atlassian.net"}, runner: runner}
+
+	if _, err := a.ListTickets(context.Background(), "1", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	jqlStr := strings.Join(allArgs[1], " ")
+	if !strings.Contains(jqlStr, "assignee = currentUser()") {
+		t.Errorf("expected 'assignee = currentUser()' in JQL, got: %v", allArgs[1])
+	}
+}
+
 func TestListTicketsThreeMonthFloorOverridesOldSince(t *testing.T) {
 	var allArgs [][]string
 	runner := sequentialRunnerWithArgs(&allArgs, []runnerResponse{
