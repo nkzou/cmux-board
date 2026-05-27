@@ -54,6 +54,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.handleAssignmentEditorMode(msg)
 	case ModeFilter:
 		return m.handleFilterMode(msg)
+	case ModeRepoPicker:
+		return m.handleRepoPickerMode(msg)
 	case ModeHelp:
 		return m.handleHelpMode(msg)
 	default:

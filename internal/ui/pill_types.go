@@ -36,3 +36,21 @@ type assignmentEditorState struct {
 	checked   map[string]bool // current toggle state (pre-populated from state)
 	cursorIdx int
 }
+
+// repoPickerRow is one row in the repo picker overlay.
+type repoPickerRow struct {
+	repoID      string
+	displayName string
+	stale       bool // true when repoID is not in cfg.Repos
+}
+
+// repoPickerState holds ephemeral view state for the repo picker overlay.
+// Used for first-touch (0 assigned) and multi-repo (2+ assigned) flows.
+type repoPickerState struct {
+	ticketID  string
+	rows      []repoPickerRow
+	cursorIdx int
+	// firstTouch is true when this picker is opened for a 0-assigned ticket;
+	// on selection the chosen id is appended to assigned_repo_ids.
+	firstTouch bool
+}
