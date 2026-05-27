@@ -1,6 +1,9 @@
 package state
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // AssignedRepoIDs returns a copy of the assigned_repo_ids slice for the given ticketID.
 // Returns nil if the ticket does not exist or has no assignments.
@@ -65,6 +68,28 @@ func RemoveAssignment(s *State, ticketID, repoID string) error {
 		}
 	}
 	ticket.AssignedRepoIDs = filtered
+	s.Tickets[ticketID] = ticket
+	return nil
+}
+
+// ApplyAssignments replaces s.Tickets[ticketID].AssignedRepoIDs with newAssigned.
+// newAssigned is the complete desired set; any previously-assigned IDs not present
+// in newAssigned are dropped. Insertion order follows newAssigned (sorted by caller).
+//
+// MUST be called inside a store.Mutate closure; never on a snapshot.
+func ApplyAssignments(s *State, ticketID string, newAssigned []string) error {
+	if s.Tickets == nil {
+		return fmt.Errorf("state.Tickets map is nil; cannot apply assignments for %q", ticketID)
+	}
+	ticket, ok := s.Tickets[ticketID]
+	if !ok {
+		return fmt.Errorf("ticket %q not found in state", ticketID)
+	}
+	// Normalize: sort to canonical order before storing.
+	sorted := make([]string, len(newAssigned))
+	copy(sorted, newAssigned)
+	sort.Strings(sorted)
+	ticket.AssignedRepoIDs = sorted
 	s.Tickets[ticketID] = ticket
 	return nil
 }
