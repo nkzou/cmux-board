@@ -73,6 +73,17 @@ func (s *Store) Snapshot() (*State, uint64) {
 	return deepCopyState(s.state), s.revision
 }
 
+// Flush writes the current in-memory state to disk without modifying it.
+// Safe to call concurrently with Mutate (acquires the same mu lock).
+func (s *Store) Flush() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := persistState(s.path, s.state); err != nil {
+		return fmt.Errorf("flush: failed to persist state: %w", err)
+	}
+	return nil
+}
+
 // persistState atomically writes state to disk (delegates to atomicfile.WriteFile).
 func persistState(path string, st *State) error {
 	data, err := json.MarshalIndent(st, "", "  ")
