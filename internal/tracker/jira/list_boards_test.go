@@ -24,8 +24,7 @@ func TestListBoardsSinglePage(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	boards, err := adapter.ListBoards(context.Background())
 	if err != nil {
@@ -63,8 +62,7 @@ func TestListBoardsPagination(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	boards, err := adapter.ListBoards(context.Background())
 	if err != nil {
@@ -93,8 +91,7 @@ func TestListBoardsTotalGuard(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	boards, err := adapter.ListBoards(context.Background())
 	if err != nil {
@@ -115,8 +112,7 @@ func TestListBoards401(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "bad"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	_, err := adapter.ListBoards(context.Background())
 	if err == nil {
