@@ -2,13 +2,19 @@ package jira
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	model "github.com/ctreminiom/go-atlassian/v2/pkg/infra/models"
 	"github.com/kevin-zou/cmux-board/internal/tracker"
+)
+
+const (
+	defaultRetryAfter     = 60 * time.Second
+	maxRetryAfter         = 5 * time.Minute
+	invalidTransitionMsg  = "It is not possible to perform this transition"
 )
 
 // errRetryable is returned when the server signals the request should be retried
@@ -40,7 +46,6 @@ func (e *errAuth) Error() string {
 func (e *errAuth) IsAuthError() bool { return true }
 
 // errCAPTCHA is returned when the Jira CAPTCHA lockout header is present.
-// Resolution: the user must log in via browser to clear the CAPTCHA.
 type errCAPTCHA struct{}
 
 func (e *errCAPTCHA) Error() string {
@@ -60,85 +65,68 @@ func (e *errFatal) Error() string {
 const (
 	seraphLoginReasonHeader = "X-Seraph-LoginReason"
 	captchaDeniedValue      = "AUTHENTICATION_DENIED"
-	invalidTransitionMsg    = "It is not possible to perform this transition"
 )
 
-// classifyResponse reads the HTTP response status and body snapshot, then returns
-// the appropriate typed error (nil if 2xx). The body is read and buffered here;
-// the returned bodyBytes slice is safe for the caller to decode after classifyResponse returns.
-// The response body is consumed; callers MUST NOT read resp.Body after calling this.
+// mapResponseError converts a go-atlassian ResponseScheme into our typed errors.
+// Call when the library returns a non-nil error or when you need to check for
+// CAPTCHA / non-2xx status from the embedded *http.Response.
 //
-// Decision table (precedence order):
-//  1. CAPTCHA header present → errCAPTCHA (regardless of status)
-//  2. 2xx → nil, body returned
+// Decision table:
+//  1. CAPTCHA header present → errCAPTCHA
+//  2. 401 → errAuth
 //  3. 409 → tracker.ErrConflict
-//  4. 401 → errAuth
-//  5. 429 or 5xx → errRetryable with Retry-After delay
-//  6. 400 + workflow-forbidden body → tracker.ErrInvalidTransition
-//  7. default → errFatal
-func classifyResponse(resp *http.Response) ([]byte, error) {
-	// 1. CAPTCHA check — takes precedence over everything including 2xx.
-	if strings.Contains(resp.Header.Get(seraphLoginReasonHeader), captchaDeniedValue) {
-		// Drain body to allow connection reuse.
-		if resp.Body != nil {
-			io.Copy(io.Discard, resp.Body) //nolint:errcheck
-			resp.Body.Close()
-		}
-		return nil, &errCAPTCHA{}
+//  4. 429 or 5xx → errRetryable
+//  5. 400 + workflow-forbidden body → tracker.ErrInvalidTransition
+//  6. default → errFatal
+func mapResponseError(resp *model.ResponseScheme) error {
+	if resp == nil {
+		return fmt.Errorf("tracker: nil response scheme")
 	}
 
-	// 2. 2xx — success; read and return body.
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		if resp.Body == nil {
-			return nil, nil
+	// 1. CAPTCHA check on the embedded *http.Response header.
+	if resp.Response != nil {
+		if strings.Contains(resp.Response.Header.Get(seraphLoginReasonHeader), captchaDeniedValue) {
+			return &errCAPTCHA{}
 		}
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body: %w", err)
-		}
-		return body, nil
 	}
 
-	// For all error cases, drain and close the body.
-	var bodyBytes []byte
-	if resp.Body != nil {
-		defer resp.Body.Close()
-		bodyBytes, _ = io.ReadAll(resp.Body)
+	body := resp.Bytes.String()
+	code := resp.Code
+
+	// 2. 401
+	if code == http.StatusUnauthorized {
+		return &errAuth{statusCode: code}
 	}
 
 	// 3. 409 — OCC conflict.
-	if resp.StatusCode == http.StatusConflict {
-		return nil, tracker.ErrConflict
+	if code == http.StatusConflict {
+		return tracker.ErrConflict
 	}
 
-	// 4. 401 — auth error (CAPTCHA already handled above).
-	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, &errAuth{statusCode: resp.StatusCode}
+	// 4. 429 or 5xx — retryable.
+	if code == http.StatusTooManyRequests || code >= 500 {
+		delay := retryAfterFromResp(resp)
+		return &errRetryable{statusCode: code, retryAfter: delay}
 	}
 
-	// 5. 429 or 5xx — retryable.
-	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-		delay := retryAfterFromHeader(resp)
-		return nil, &errRetryable{statusCode: resp.StatusCode, retryAfter: delay}
-	}
-
-	// 6. 400 — check for workflow-forbidden message.
-	if resp.StatusCode == http.StatusBadRequest {
-		if strings.Contains(string(bodyBytes), invalidTransitionMsg) {
-			return nil, tracker.ErrInvalidTransition
+	// 5. 400 — check for workflow-forbidden message.
+	if code == http.StatusBadRequest {
+		if strings.Contains(body, invalidTransitionMsg) {
+			return tracker.ErrInvalidTransition
 		}
-		return nil, &errFatal{statusCode: resp.StatusCode, body: string(bodyBytes)}
+		return &errFatal{statusCode: code, body: body}
 	}
 
-	// 7. Default — all other non-2xx.
-	return nil, &errFatal{statusCode: resp.StatusCode, body: string(bodyBytes)}
+	// 6. Default.
+	return &errFatal{statusCode: code, body: body}
 }
 
-// retryAfterFromHeader parses the Retry-After header (integer seconds).
-// Returns defaultRetryAfter if absent or unparseable; caps at maxRetryAfter.
-func retryAfterFromHeader(resp *http.Response) time.Duration {
-	val := resp.Header.Get("Retry-After")
+// retryAfterFromResp parses the Retry-After header from the embedded *http.Response.
+func retryAfterFromResp(resp *model.ResponseScheme) time.Duration {
+	if resp.Response == nil {
+		return defaultRetryAfter
+	}
+	val := resp.Response.Header.Get("Retry-After")
 	if val == "" {
 		return defaultRetryAfter
 	}
