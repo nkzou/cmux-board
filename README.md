@@ -22,7 +22,7 @@ A background poller keeps the board in sync. Pushing a card to a different colum
 Build from source:
 
 ```bash
-git clone https://github.com/kevin-zou/cmux-board
+git clone https://github.com/nkzou/cmux-board
 cd cmux-board
 make build
 # binary: ./cmux-board
@@ -95,6 +95,12 @@ go vet ./...          # Vet
 ```
 
 See [docs/smoke-test.md](docs/smoke-test.md) for the manual end-to-end checklist.
+
+---
+
+## Credits
+
+Based on [openkanban](https://github.com/TechDufus/openkanban) by TechDufus. The BubbleTea board view in `internal/ui/` and the git-worktree helpers in `internal/git/` were ported from it.
 
 ---
 
