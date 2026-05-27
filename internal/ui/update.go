@@ -76,23 +76,33 @@ func (m Model) refreshSnapshot() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// handlePollOK clears the poll-error state and refreshes the snapshot.
+// handlePollOK clears the poll-error state, refreshes the snapshot, and emits the
+// tracker-OK pill.
 func (m Model) handlePollOK(msg PollOKMsg) (Model, tea.Cmd) {
 	m.pollFailedAt = nil
 	m.pollErrCode = ""
-	m, cmd := m.refreshSnapshot()
-	// TODO(T-058): emit PillTrackerOK via emitPill.
+	m, refreshCmd := m.refreshSnapshot()
+	m, pillCmd := m.emitPill(PillKeyTracker, PillTrackerOK)
 	_ = msg
-	return m, cmd
+	return m, tea.Batch(refreshCmd, pillCmd)
 }
 
-// handlePollErr records the poll failure time and error code.
+// handlePollErr records the poll failure time and error code, and emits the appropriate
+// tracker pill (offline or re-auth required).
 func (m Model) handlePollErr(msg PollErrMsg) (Model, tea.Cmd) {
 	t := msg.When
 	m.pollFailedAt = &t
 	m.pollErrCode = msg.Code
-	// TODO(T-058): emit pill update via emitPill.
-	return m, nil
+
+	var pillText string
+	switch msg.Code {
+	case "401":
+		pillText = PillTrackerReauth
+	default:
+		pillText = trackerOfflineText(msg.When)
+	}
+	m, cmd := m.emitPill(PillKeyTracker, pillText)
+	return m, cmd
 }
 
 // handlePushOK is a stub; full implementation in T-065.
