@@ -18,7 +18,6 @@ func testWizardInput() WizardInput {
 		Adapter:         "jira",
 		Site:            "testorg.atlassian.net",
 		Email:           "user@example.com",
-		APIToken:        "super-secret-api-token-here-please",
 		BoardID:         "board-1",
 		BoardName:       "My Board",
 		WorktreeBaseDir: "/tmp/worktrees",
@@ -86,17 +85,17 @@ func TestFinalize_HappyPath(t *testing.T) {
 	if err := json.Unmarshal(credsData, &credFile); err != nil {
 		t.Fatalf("credentials.json parse error: %v", err)
 	}
-	if credFile.Adapters["jira"].APIToken != input.APIToken {
-		t.Errorf("credentials.json: token mismatch")
+	if credFile.Adapters["jira"].SiteURL != input.Site {
+		t.Errorf("credentials.json: site mismatch: got %q, want %q",
+			credFile.Adapters["jira"].SiteURL, input.Site)
+	}
+	if credFile.Adapters["jira"].AuthMethod != "acli" {
+		t.Errorf("credentials.json: auth_method: got %q, want %q",
+			credFile.Adapters["jira"].AuthMethod, "acli")
 	}
 	credsFi, _ := os.Stat(credsPath)
 	if credsFi.Mode().Perm() != 0600 {
 		t.Errorf("credentials.json mode: want 0600, got %04o", credsFi.Mode().Perm())
-	}
-
-	// API token must not appear in output
-	if strings.Contains(w.String(), input.APIToken) {
-		t.Errorf("API token leaked into output: %q", w.String())
 	}
 
 	// Dock snippet and template help in output

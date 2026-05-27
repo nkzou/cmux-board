@@ -19,8 +19,7 @@ import (
 type WizardInput struct {
 	Adapter         string             // e.g. "jira"
 	Site            string
-	Email           string
-	APIToken        string             // redacted in all log/print output; never printed
+	Email           string             // resolved from acli auth status; for display only
 	BoardID         string
 	BoardName       string
 	WorktreeBaseDir string
@@ -34,11 +33,13 @@ type WizardInput struct {
 // verifies mode bits, and prints the Dock snippet + template help.
 // configDir is the directory for all three files (default ~/.config/cmux-board/).
 func Finalize(ctx context.Context, w io.Writer, r io.Reader, input WizardInput, configDir string) error {
-	// Print summary (API token is NOT printed).
+	// Print summary.
 	fmt.Fprintln(w, "--- cmux-board init summary ---")
 	fmt.Fprintf(w, "Adapter:       %s\n", input.Adapter)
 	fmt.Fprintf(w, "Site:          %s\n", input.Site)
-	fmt.Fprintf(w, "Email:         %s\n", input.Email)
+	if input.Email != "" {
+		fmt.Fprintf(w, "Email:         %s\n", input.Email)
+	}
 	fmt.Fprintf(w, "Board:         %s (%s)\n", input.BoardName, input.BoardID)
 	fmt.Fprintf(w, "Worktree base: %s\n", input.WorktreeBaseDir)
 	fmt.Fprintf(w, "Approach:      %s\n", input.DefaultApproach)
@@ -170,20 +171,20 @@ type credentialsFile struct {
 }
 
 type adapterCreds struct {
-	Email    string `json:"email,omitempty"`
-	APIToken string `json:"api_token,omitempty"`
-	SiteURL  string `json:"site_url,omitempty"`
+	AuthMethod string `json:"auth_method,omitempty"`
+	SiteURL    string `json:"site_url,omitempty"`
 }
 
 // buildCredentials constructs the credentials file content from wizard input.
+// For the acli-backed jira adapter, no secrets are stored here — acli owns auth.
+// The file is kept for the 0600 mode-bit validation pattern.
 func buildCredentials(input WizardInput) credentialsFile {
 	return credentialsFile{
 		SchemaVersion: credentialsSchema,
 		Adapters: map[string]adapterCreds{
 			"jira": {
-				Email:    input.Email,
-				APIToken: input.APIToken,
-				SiteURL:  input.Site,
+				AuthMethod: "acli",
+				SiteURL:    input.Site,
 			},
 		},
 	}
