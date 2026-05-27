@@ -54,7 +54,9 @@ type dockDeps struct {
 	// newTracker constructs the issue tracker from credentials.
 	newTracker func(creds config.Credentials) tracker.IssueTracker
 	// runProgram runs the BubbleTea program and returns when the user quits.
-	runProgram func(ctx context.Context, cfg *config.Config, store *state.Store, emitFn func(tea.Msg)) error
+	// resultCh, when non-nil, is drained and forwarded to the program via Send.
+	// Production passes bridge.ResultCh; tests pass nil (no-op).
+	runProgram func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error
 	// logWriter is the underlying writer for the logger (nil = os.Stderr).
 	logWriter io.Writer
 }
@@ -86,9 +88,25 @@ func prodDockDeps() dockDeps {
 				APIToken: jiraCreds.APIToken,
 			})
 		},
-		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, emitFn func(tea.Msg)) error {
+		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error {
 			model := ui.NewModelWithContext(ctx, cfg, store)
 			prog := tea.NewProgram(model, tea.WithAltScreen(), tea.WithOutput(os.Stderr))
+			// Drain bridge.ResultCh and forward each message to the program.
+			if resultCh != nil {
+				go func() {
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case msg, ok := <-resultCh:
+							if !ok {
+								return
+							}
+							prog.Send(msg)
+						}
+					}
+				}()
+			}
 			_, err := prog.Run()
 			return err
 		},
@@ -169,22 +187,18 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 	// Construct the tracker adapter.
 	tr := deps.newTracker(creds)
 
-	// Step 8: Start sync.Poller in a goroutine.
-	// emitFn sends poll events to the BubbleTea program.
-	// M-011 T-083 bridges the poller to the program's event loop; for M-010
-	// the pointer is captured by the closure after program creation.
-	var poller *isync.Poller
-	emitFn := func(msg tea.Msg) {
-		// No-op until bridge is wired in M-011. Poller still runs for state mutations.
-		_ = msg
-	}
-	poller = isync.NewPoller(ctx, &cfg, tr, store, emitFn)
+	// Step 8: Create bridge and start sync.Poller + push worker.
+	// bridge.ResultCh is drained inside runProgram via prog.Send.
+	bridge := isync.NewBridge()
+	poller := isync.NewPoller(ctx, &cfg, tr, store, bridge.EmitFn())
+	go bridge.RunPushWorker(ctx, store, tr)
 
 	// Shutdown coordinator.
 	coord := runtime.NewCoordinator(cancel, poller, store, slog.Default())
 
 	// Step 9: Run BubbleTea program (blocks until user presses q).
-	if err := deps.runProgram(ctx, &cfg, store, emitFn); err != nil {
+	// bridge.ResultCh draining is handled inside runProgram via prog.Send.
+	if err := deps.runProgram(ctx, &cfg, store, bridge.ResultCh); err != nil {
 		slog.Error("bubbletea program exited with error", "err", err)
 	}
 
