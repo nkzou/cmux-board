@@ -20,6 +20,7 @@ type renderColumnParams struct {
 	activeTicket int
 	hoverTicket  int
 	colors       uiColors
+	spinnerGlyph string
 }
 
 // renderColumn renders a single kanban column with its tickets.
@@ -67,12 +68,13 @@ func renderColumn(p renderColumnParams) string {
 		isSelected := p.isActive && i == p.activeTicket
 		isTicketHovered := p.isHovered && i == p.hoverTicket
 		ticketViews = append(ticketViews, renderTicket(renderTicketParams{
-			ticket:      ticket,
-			isSelected:  isSelected,
-			isHovered:   isTicketHovered,
-			width:       p.width - 4,
-			accentColor: headerColor,
-			colors:      p.colors,
+			ticket:       ticket,
+			isSelected:   isSelected,
+			isHovered:    isTicketHovered,
+			width:        p.width - 4,
+			accentColor:  headerColor,
+			colors:       p.colors,
+			spinnerGlyph: p.spinnerGlyph,
 		}))
 	}
 
