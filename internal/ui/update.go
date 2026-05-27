@@ -127,14 +127,20 @@ func (m Model) handlePushConflict(msg PushConflictMsg) (Model, tea.Cmd) {
 
 // handleActivationDone handles activation completion or error. The per-ticket
 // in-flight marker is cleared regardless of outcome so a failed activation
-// doesn't leave the ticket permanently locked.
+// doesn't leave the ticket permanently locked. The snapshot is also re-read
+// from the store so the new activation entry shows up immediately in the
+// worktree badge — the Activate goroutine wrote to the store but didn't pump
+// a refresh through the UI, so without this the badge wouldn't appear until
+// the next poll cycle.
 func (m Model) handleActivationDone(msg activationDoneMsg) (Model, tea.Cmd) {
 	m = m.clearActivating(msg.TicketID)
+	m, refreshCmd := m.refreshSnapshot()
 	if msg.Err != nil {
 		// TODO(T-058): emit cmux/claude pill update for specific error types.
-		return m.pushToast(userFriendlyError(msg.Err))
+		mAfter, toastCmd := m.pushToast(userFriendlyError(msg.Err))
+		return mAfter, tea.Batch(refreshCmd, toastCmd)
 	}
-	return m, nil
+	return m, refreshCmd
 }
 
 // handleActivationStep is a stub; full implementation in T-062.
@@ -143,8 +149,11 @@ func (m Model) handleActivationStep(_ activationStepMsg) (Model, tea.Cmd) {
 }
 
 // handleFocusResult handles the outcome of the Focus goroutine (T-063).
+// Focus mutates last_focused_at and may create a replacement cmux workspace,
+// so the snapshot is re-read to keep the board consistent with persisted state.
 func (m Model) handleFocusResult(msg focusResultMsg) (Model, tea.Cmd) {
 	res := msg.result
+	m, _ = m.refreshSnapshot()
 	if res.Err != nil {
 		return m.pushToast(userFriendlyError(res.Err))
 	}
