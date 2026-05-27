@@ -382,7 +382,7 @@ func resumeMissingSteps(
 		ref, err := cmuxDrv.newWorkspace(ctx, cmuxcli.NewWorkspaceArgs{
 			Name:               entry.CmuxName,
 			CWD:                worktreeDir,
-			AgentAttachCommand: "claude attach " + shortID,
+			AgentAttachCommand: claudecli.BuildAttachCommand(shortID),
 		})
 		if err != nil {
 			t.Fatalf("resumeMissingSteps cmux: %v", err)
