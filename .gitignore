@@ -1,0 +1,18 @@
+# Binary
+openkanban
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test/coverage
+coverage.out
+*.test
+
