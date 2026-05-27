@@ -62,7 +62,6 @@ func runCmux(ctx context.Context, args ...string) (stdout []byte, stderr []byte,
 		if runErr == nil && !containsAny(stderr, socketBrokenPatterns) {
 			return stdout, stderr, nil
 		}
-		err = runErr
 	}
 
 	return stdout, lastStderr,

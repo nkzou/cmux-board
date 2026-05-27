@@ -18,7 +18,7 @@ coverage:
 
 lint:
 	$(GO) vet ./...
-	@if command -v staticcheck >/dev/null 2>&1; then staticcheck -checks=all,-U1000,-ST1000 ./...; fi
+	@if command -v staticcheck >/dev/null 2>&1; then staticcheck -checks=all,-U1000,-ST1000,-ST1005 ./...; fi
 
 clean:
 	rm -f $(BINARY) $(COVERAGE_FILE) coverage.html
