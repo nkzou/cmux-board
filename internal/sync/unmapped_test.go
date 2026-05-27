@@ -120,3 +120,27 @@ func TestResolve_MultipleTicketsPerColumn(t *testing.T) {
 		t.Errorf("TC-6: want 2 tickets in column, got %d", len(col))
 	}
 }
+
+// TC-7: case-insensitive status matching — acli may return names with different
+// capitalisation than what the user typed in the wizard.
+func TestResolve_CaseInsensitiveStatus(t *testing.T) {
+	// Column configured with "In Progress" (title case).
+	board := makeBoard("in-progress", []string{"In Progress"})
+	tickets := map[string]state.TicketState{
+		// Ticket status arrives lowercase from some acli version.
+		"PROJ-1": {Key: "PROJ-1", Status: "in progress"},
+		// Ticket status arrives all-caps.
+		"PROJ-2": {Key: "PROJ-2", Status: "IN PROGRESS"},
+		// Exact match still works.
+		"PROJ-3": {Key: "PROJ-3", Status: "In Progress"},
+	}
+	mapped, unmapped := Resolve(board, tickets)
+
+	if len(unmapped) != 0 {
+		t.Errorf("TC-7: want 0 unmapped, got %d: %v", len(unmapped), unmapped)
+	}
+	col := mapped["in-progress"]
+	if len(col) != 3 {
+		t.Errorf("TC-7: want 3 tickets in column, got %d: %v", len(col), col)
+	}
+}
