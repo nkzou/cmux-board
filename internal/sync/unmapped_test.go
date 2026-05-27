@@ -144,3 +144,48 @@ func TestResolve_CaseInsensitiveStatus(t *testing.T) {
 		t.Errorf("TC-7: want 3 tickets in column, got %d: %v", len(col), col)
 	}
 }
+
+// TC-8: tickets within a column are sorted by key with natural (numeric)
+// ordering, and the unmapped bucket is sorted the same way. Without this,
+// random map iteration would shuffle the board on every poll.
+func TestResolve_SortsByKeyNaturalOrder(t *testing.T) {
+	board := makeBoard("in-progress", []string{"In Progress"})
+	tickets := map[string]state.TicketState{
+		"PROJ-10": {Key: "PROJ-10", Status: "In Progress"},
+		"PROJ-2":  {Key: "PROJ-2", Status: "In Progress"},
+		"PROJ-1":  {Key: "PROJ-1", Status: "In Progress"},
+		"PROJ-11": {Key: "PROJ-11", Status: "Other"},
+		"PROJ-3":  {Key: "PROJ-3", Status: "Other"},
+	}
+	mapped, unmapped := Resolve(board, tickets)
+
+	wantMapped := []string{"PROJ-1", "PROJ-2", "PROJ-10"}
+	gotMapped := make([]string, 0, len(mapped["in-progress"]))
+	for _, t := range mapped["in-progress"] {
+		gotMapped = append(gotMapped, t.Key)
+	}
+	if !equalKeys(gotMapped, wantMapped) {
+		t.Errorf("mapped: want %v, got %v", wantMapped, gotMapped)
+	}
+
+	wantUnmapped := []string{"PROJ-3", "PROJ-11"}
+	gotUnmapped := make([]string, 0, len(unmapped))
+	for _, t := range unmapped {
+		gotUnmapped = append(gotUnmapped, t.Key)
+	}
+	if !equalKeys(gotUnmapped, wantUnmapped) {
+		t.Errorf("unmapped: want %v, got %v", wantUnmapped, gotUnmapped)
+	}
+}
+
+func equalKeys(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
