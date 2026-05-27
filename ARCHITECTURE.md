@@ -9,9 +9,9 @@ git worktree, a background claude agent, and a cmux workspace with two panes.
 
 ## Module and binary
 
-- Module: `github.com/kevin-zou/cmux-board`
+- Module: `github.com/nkzou/cmux-board`
 - Binary: `cmux-board`
-- Install: `go install github.com/kevin-zou/cmux-board/cmd/cmux-board@<commit>`
+- Install: `go install github.com/nkzou/cmux-board/cmd/cmux-board@<commit>`
 
 ## Directory layout
 

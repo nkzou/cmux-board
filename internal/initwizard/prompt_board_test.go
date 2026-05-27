@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // boardMockAdapter wraps mockAdapter with a custom ListBoards.

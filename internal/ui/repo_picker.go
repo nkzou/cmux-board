@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/config"
 )
 
 // newRepoPickerState builds a repoPickerState for the given ticketID.

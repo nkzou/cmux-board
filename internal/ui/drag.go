@@ -6,9 +6,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	internalsync "github.com/kevin-zou/cmux-board/internal/sync"
-	"github.com/kevin-zou/cmux-board/internal/state"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	internalsync "github.com/nkzou/cmux-board/internal/sync"
+	"github.com/nkzou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // pushResultMsg is emitted when the async push goroutine completes.

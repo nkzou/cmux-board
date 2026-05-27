@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kevin-zou/cmux-board/internal/secretsink"
+	"github.com/nkzou/cmux-board/internal/secretsink"
 )
 
 // NewLogger builds a structured slog.Logger that writes to stderr through the

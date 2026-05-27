@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/config"
 )
 
 func init() {

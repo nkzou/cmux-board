@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // RepoResolution is the output of resolveRepoAndRoute.

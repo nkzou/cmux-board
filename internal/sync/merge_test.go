@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // TC-1: tracker-owned fields overwritten; local-only (assigned_repo_ids) preserved.

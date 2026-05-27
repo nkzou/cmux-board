@@ -12,7 +12,7 @@ import (
 
 	v3 "github.com/ctreminiom/go-atlassian/v2/jira/v3"
 	"github.com/ctreminiom/go-atlassian/v2/jira/agile"
-	"github.com/kevin-zou/cmux-board/internal/secretsink"
+	"github.com/nkzou/cmux-board/internal/secretsink"
 )
 
 func testCredentials() Credentials {

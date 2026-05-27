@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // RepoArgs is the input to AddRepo.

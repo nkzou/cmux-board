@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 func makeBoard(colID string, statusIDs []string) state.BoardSnapshot {

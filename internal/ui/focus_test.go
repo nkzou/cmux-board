@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kevin-zou/cmux-board/internal/cmuxcli"
-	"github.com/kevin-zou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/cmuxcli"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // mockCmuxCli implements focusCmuxCli for testing.

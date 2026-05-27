@@ -3,7 +3,7 @@ package jira
 import (
 	v3 "github.com/ctreminiom/go-atlassian/v2/jira/v3"
 	"github.com/ctreminiom/go-atlassian/v2/jira/agile"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // JiraAdapter implements tracker.IssueTracker for Jira Cloud via go-atlassian.

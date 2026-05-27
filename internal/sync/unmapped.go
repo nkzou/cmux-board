@@ -1,6 +1,6 @@
 package sync
 
-import "github.com/kevin-zou/cmux-board/internal/state"
+import "github.com/nkzou/cmux-board/internal/state"
 
 // Resolve partitions tickets into mapped (column ID → ticket slice) and unmapped.
 // A ticket is unmapped when its Status field does not appear in any column's StatusIDs.

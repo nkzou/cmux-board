@@ -12,12 +12,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/oklog/ulid/v2"
 
-	"github.com/kevin-zou/cmux-board/internal/claudecli"
-	"github.com/kevin-zou/cmux-board/internal/cmuxcli"
-	"github.com/kevin-zou/cmux-board/internal/config"
-	"github.com/kevin-zou/cmux-board/internal/git"
-	"github.com/kevin-zou/cmux-board/internal/state"
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/claudecli"
+	"github.com/nkzou/cmux-board/internal/cmuxcli"
+	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/git"
+	"github.com/nkzou/cmux-board/internal/state"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // actIDShortRegex validates Crockford-base32 lowercase 8-char act_id_short values.

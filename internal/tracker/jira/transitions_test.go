@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/kevin-zou/cmux-board/internal/tracker"
+	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 func TestLoadTransitionCachePopulatesRaw(t *testing.T) {
