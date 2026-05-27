@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,6 +17,10 @@ import (
 // All external I/O (polling, activation, focus) is performed in tea.Cmd goroutines
 // that communicate results back as tea.Msg values. Update itself is non-blocking.
 type Model struct {
+	// Startup context — captured at NewModel time; all I/O Cmds close over this.
+	// Cancelled when the dock shuts down.
+	ctx context.Context
+
 	// Core data (read from store snapshots)
 	cfg         *config.Config
 	store       *state.Store
@@ -62,7 +67,14 @@ type Model struct {
 // NewModel constructs a Model from cfg and store. Takes an initial snapshot so the
 // board is populated before the first render. The approach-name input is initialized
 // but not focused; it is focused when the mode transitions to ModeApproachName.
+// ctx is stored for use by I/O Cmds; pass context.Background() in tests.
 func NewModel(cfg *config.Config, store *state.Store) Model {
+	return NewModelWithContext(context.Background(), cfg, store)
+}
+
+// NewModelWithContext is like NewModel but accepts an explicit context for production use.
+// The dock cobra command should pass a context that it cancels on shutdown.
+func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.Store) Model {
 	input := textinput.New()
 	input.Placeholder = "approach name"
 	input.CharLimit = 64
@@ -70,6 +82,7 @@ func NewModel(cfg *config.Config, store *state.Store) Model {
 	snap, rev := store.Snapshot()
 
 	return Model{
+		ctx:               ctx,
 		cfg:               cfg,
 		store:             store,
 		snapshot:          snap,
