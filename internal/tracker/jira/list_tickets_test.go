@@ -28,7 +28,7 @@ func TestListTicketsHappyPath(t *testing.T) {
 					"assignee": {"accountId": "acc-1"},
 					"labels": ["backend", "urgent"],
 					"priority": {"name": "High"},
-					"updated": "2026-05-26T12:00:00.000Z"
+					"updated": "2026-05-26T12:00:00-0000"
 				}
 			}]
 		}`))
@@ -36,8 +36,7 @@ func TestListTicketsHappyPath(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: site, Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	tickets, err := adapter.ListTickets(context.Background(), "1", nil)
 	if err != nil {
@@ -89,7 +88,7 @@ func TestListTicketsNullableFields(t *testing.T) {
 					"assignee": null,
 					"labels": [],
 					"priority": null,
-					"updated": "2026-05-01T00:00:00.000Z"
+					"updated": "2026-05-01T00:00:00-0000"
 				}
 			}]
 		}`))
@@ -97,8 +96,7 @@ func TestListTicketsNullableFields(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	tickets, err := adapter.ListTickets(context.Background(), "1", nil)
 	if err != nil {
@@ -124,20 +122,19 @@ func TestListTicketsPagination(t *testing.T) {
 		if n == 1 {
 			w.Write([]byte(`{
 				"startAt": 0, "maxResults": 50, "total": 2,
-				"issues": [{"id":"1","key":"A-1","self":"","fields":{"summary":"A","status":{"id":"1","name":"To Do"},"labels":[],"updated":"2026-01-01T00:00:00Z"}}]
+				"issues": [{"id":"1","key":"A-1","self":"","fields":{"summary":"A","status":{"id":"1","name":"To Do"},"labels":[],"updated":"2026-01-01T00:00:00-0000"}}]
 			}`))
 		} else {
 			w.Write([]byte(`{
 				"startAt": 1, "maxResults": 50, "total": 2,
-				"issues": [{"id":"2","key":"A-2","self":"","fields":{"summary":"B","status":{"id":"1","name":"To Do"},"labels":[],"updated":"2026-01-01T00:00:00Z"}}]
+				"issues": [{"id":"2","key":"A-2","self":"","fields":{"summary":"B","status":{"id":"1","name":"To Do"},"labels":[],"updated":"2026-01-01T00:00:00-0000"}}]
 			}`))
 		}
 	}))
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	tickets, err := adapter.ListTickets(context.Background(), "1", nil)
 	if err != nil {
@@ -162,8 +159,7 @@ func TestListTicketsSinceFilter(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	since := time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
 	_, err := adapter.ListTickets(context.Background(), "1", &since)
@@ -184,14 +180,13 @@ func TestListTicketsRawIsNonNil(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
 			"startAt": 0, "maxResults": 50, "total": 1,
-			"issues": [{"id":"1","key":"X-1","self":"","fields":{"summary":"x","status":{"id":"1","name":"To Do"},"labels":[],"updated":"2026-01-01T00:00:00Z"}}]
+			"issues": [{"id":"1","key":"X-1","self":"","fields":{"summary":"x","status":{"id":"1","name":"To Do"},"labels":[],"updated":"2026-01-01T00:00:00-0000"}}]
 		}`))
 	}))
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	tickets, err := adapter.ListTickets(context.Background(), "1", nil)
 	if err != nil {
@@ -214,8 +209,7 @@ func TestListTickets401(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "bad"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	_, err := adapter.ListTickets(context.Background(), "1", nil)
 	if err == nil {
@@ -234,8 +228,7 @@ func TestListTickets5xx(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	_, err := adapter.ListTickets(context.Background(), "1", nil)
 	if err == nil {

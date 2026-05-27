@@ -24,8 +24,7 @@ func TestWhoAmIHappyPath(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "alice@example.com", APIToken: "token"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	identity, err := adapter.WhoAmI(context.Background())
 	if err != nil {
@@ -49,8 +48,7 @@ func TestWhoAmI401(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "alice@example.com", APIToken: "bad"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	_, err := adapter.WhoAmI(context.Background())
 	if err == nil {
@@ -70,8 +68,7 @@ func TestWhoAmICAPTCHA(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "alice@example.com", APIToken: "token"}
-	c := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
-	adapter := newJiraAdapterWithClient(c)
+	adapter := newTestAdapter(t, srv, creds)
 
 	_, err := adapter.WhoAmI(context.Background())
 	if err == nil {

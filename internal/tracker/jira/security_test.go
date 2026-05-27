@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	jirasecKnownToken = "ATATT3xFfGF0ABCDEFGHIJKLMNOPQRSTUVWXYZabcd1234"
-	jirasecEmail      = "user@example.com"
+	jirasecKnownToken  = "ATATT3xFfGF0ABCDEFGHIJKLMNOPQRSTUVWXYZabcd1234"
+	jirasecEmail       = "user@example.com"
 	jirasecTestTimeout = 5 * time.Second
 )
 
@@ -34,7 +34,7 @@ func jirasecLogger(t *testing.T, buf *bytes.Buffer) func() {
 
 // TestF20d_NoHeaderLoggingDuringRequest verifies that HTTP headers (Authorization, Cookie,
 // Proxy-Authorization, and the full Basic credential) never appear in slog output during
-// a real client.Do call.
+// a real WhoAmI call through the go-atlassian-backed adapter.
 // Ties to: F20, F20.d
 func TestF20d_NoHeaderLoggingDuringRequest(t *testing.T) {
 	var receivedAuth string
@@ -59,14 +59,12 @@ func TestF20d_NoHeaderLoggingDuringRequest(t *testing.T) {
 		Email:    jirasecEmail,
 		APIToken: jirasecKnownToken,
 	}
-	client := newClientWithHTTP(creds, srv.Client())
-	client.baseURL = srv.URL
+	adapter := newTestAdapter(t, srv, creds)
 
-	resp, err := client.Do(context.Background(), "GET", "/rest/api/3/myself", nil)
+	_, err := adapter.WhoAmI(context.Background())
 	if err != nil {
-		t.Fatalf("F20.d: client.Do unexpected error: %v", err)
+		t.Fatalf("F20.d: WhoAmI unexpected error: %v", err)
 	}
-	resp.Body.Close()
 
 	captured := buf.String()
 	t.Logf("F20.d captured slog output:\n%s", captured)
@@ -115,8 +113,6 @@ func TestF20e_Meta_HeaderLeakIsDetectable(t *testing.T) {
 		Email:    jirasecEmail,
 		APIToken: jirasecKnownToken,
 	}
-	client := newClientWithHTTP(creds, srv.Client())
-	client.baseURL = srv.URL
 
 	t.Run("F20e_meta", func(t *testing.T) {
 		// Deliberately-bad fixture: logs req.Header before sending.
@@ -124,7 +120,7 @@ func TestF20e_Meta_HeaderLeakIsDetectable(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), jirasecTestTimeout)
 		defer cancel()
 
-		req, err := http.NewRequestWithContext(ctx, "GET", client.baseURL+"/rest/api/3/myself", nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", srv.URL+"/rest/api/3/myself", nil)
 		if err != nil {
 			t.Fatalf("F20e meta: build request: %v", err)
 		}
@@ -135,7 +131,7 @@ func TestF20e_Meta_HeaderLeakIsDetectable(t *testing.T) {
 		// Deliberately log the header (this is the bad fixture that SHOULD leak).
 		slog.Debug("bad-fixture", "headers", req.Header)
 
-		resp, err := client.httpClient.Do(req)
+		resp, err := srv.Client().Do(req)
 		if err != nil {
 			t.Fatalf("F20e meta: do request: %v", err)
 		}

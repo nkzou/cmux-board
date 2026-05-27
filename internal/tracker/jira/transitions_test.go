@@ -25,7 +25,7 @@ func TestLoadTransitionCachePopulatesRaw(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	client := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
+	adapter := newTestAdapter(t, srv, creds)
 
 	ticket := &tracker.Ticket{
 		ID:  "10001",
@@ -33,7 +33,7 @@ func TestLoadTransitionCachePopulatesRaw(t *testing.T) {
 		Raw: map[string]any{},
 	}
 
-	err := LoadTransitionCache(context.Background(), client, ticket)
+	err := LoadTransitionCache(context.Background(), adapter, ticket)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestLoadTransitionCacheCacheHit(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	client := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
+	adapter := newTestAdapter(t, srv, creds)
 
 	// Pre-populated cache.
 	ticket := &tracker.Ticket{
@@ -73,7 +73,7 @@ func TestLoadTransitionCacheCacheHit(t *testing.T) {
 		},
 	}
 
-	err := LoadTransitionCache(context.Background(), client, ticket)
+	err := LoadTransitionCache(context.Background(), adapter, ticket)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestLoadTransitionCacheNetworkError(t *testing.T) {
 	defer srv.Close()
 
 	creds := Credentials{Site: "test.atlassian.net", Email: "u@e.com", APIToken: "t"}
-	client := &jiraClient{httpClient: srv.Client(), baseURL: srv.URL, creds: creds}
+	adapter := newTestAdapter(t, srv, creds)
 
 	ticket := &tracker.Ticket{
 		ID:  "10001",
@@ -170,7 +170,7 @@ func TestLoadTransitionCacheNetworkError(t *testing.T) {
 		Raw: map[string]any{},
 	}
 
-	err := LoadTransitionCache(context.Background(), client, ticket)
+	err := LoadTransitionCache(context.Background(), adapter, ticket)
 	if err == nil {
 		t.Fatal("expected error on network error, got nil")
 	}
