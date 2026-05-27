@@ -99,8 +99,8 @@ func passPreflightFn() func(ctx context.Context, cfg *config.Config, creds *conf
 }
 
 // immediateExitProgram returns a runProgram dep that exits immediately.
-func immediateExitProgram() func(context.Context, *config.Config, *state.Store, func(tea.Msg)) error {
-	return func(_ context.Context, _ *config.Config, _ *state.Store, _ func(tea.Msg)) error {
+func immediateExitProgram() func(context.Context, *config.Config, *state.Store, <-chan tea.Msg) error {
+	return func(_ context.Context, _ *config.Config, _ *state.Store, _ <-chan tea.Msg) error {
 		return nil
 	}
 }
@@ -335,7 +335,7 @@ func TestDockGracefulShutdownFlushesState(t *testing.T) {
 		},
 		reconcile:  noOpReconcile,
 		newTracker: noOpNewTracker,
-		runProgram: func(_ context.Context, _ *config.Config, st *state.Store, _ func(tea.Msg)) error {
+		runProgram: func(_ context.Context, _ *config.Config, st *state.Store, _ <-chan tea.Msg) error {
 			// Verify state is accessible — simulate BubbleTea exit immediately.
 			return nil
 		},
