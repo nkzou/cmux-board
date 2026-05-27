@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/kevin-zou/cmux-board/internal/config"
+	"github.com/kevin-zou/cmux-board/internal/atomicfile"
 )
 
 // Store serializes all state.json mutations through a single mutex.
@@ -73,11 +73,11 @@ func (s *Store) Snapshot() (*State, uint64) {
 	return deepCopyState(s.state), s.revision
 }
 
-// persistState atomically writes state to disk (delegates to config.WriteFileAtomic).
+// persistState atomically writes state to disk (delegates to atomicfile.WriteFile).
 func persistState(path string, st *State) error {
 	data, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
-	return config.WriteFileAtomic(path, data, 0644)
+	return atomicfile.WriteFile(path, data, 0644)
 }
