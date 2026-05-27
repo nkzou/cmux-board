@@ -351,7 +351,7 @@ func TestDockGracefulShutdownFlushesState(t *testing.T) {
 	if err := execDockInDir(t, dir, deps); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_ = flushCalled
+	_ = &flushCalled
 
 	// After dock exits, state.json should still exist (Flush writes it).
 	statAfter, err := os.Stat(statePath)
