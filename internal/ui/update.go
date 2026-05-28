@@ -10,6 +10,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
+	case tea.MouseMsg:
+		return m.handleMouseMsg(msg)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	case PollOKMsg:
