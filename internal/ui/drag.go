@@ -55,7 +55,7 @@ func (m Model) dropTicket() (Model, tea.Cmd) {
 		return m.pushToast(fmt.Sprintf("drop failed: %s", err.Error()))
 	}
 
-	// Optimistic move: update LastKnownStatus in local model snapshot.
+	// Optimistic move: update Status in local model snapshot.
 	m = m.optimisticallyMove(ticketID, targetStatus)
 
 	// Start async push goroutine.
@@ -105,13 +105,13 @@ func (m Model) resolveTargetStatus(columnID string) (string, error) {
 	return "", fmt.Errorf("column %q not found in board", columnID)
 }
 
-// optimisticallyMove updates LastKnownStatus in the local model snapshot via store.Mutate.
+// optimisticallyMove updates Status in the local model snapshot via store.Mutate.
 // This gives an immediate UI response before the push result arrives.
 // On conflict, the push goroutine will emit a pushResultMsg that triggers snap-back.
 func (m Model) optimisticallyMove(ticketID, targetStatus string) Model {
 	_ = m.store.Mutate(func(s *state.State) error {
 		if t, ok := s.Tickets[ticketID]; ok {
-			t.LastKnownStatus = targetStatus
+			t.Status = targetStatus
 			s.Tickets[ticketID] = t
 		}
 		return nil
@@ -120,8 +120,7 @@ func (m Model) optimisticallyMove(ticketID, targetStatus string) Model {
 	snap, rev := m.store.Snapshot()
 	m.snapshot = snap
 	m.snapshotRev = rev
-	m.board = snap.Board
-	mapped, unmapped := resolveTickets(snap)
+	mapped, unmapped := resolveTicketsWithBoard(m.board, snap)
 	m.tickets = flattenMapped(m.board, mapped)
 	m.unmappedTickets = unmapped
 	return m
@@ -135,11 +134,11 @@ func (m Model) handlePushResult(msg pushResultMsg) (Model, tea.Cmd) {
 		return m.pushToast("push failed: " + msg.err.Error())
 	}
 	if msg.conflict {
-		// Snap back: restore LastKnownStatus to the server-reported status.
+		// Snap back: restore Status to the server-reported status.
 		// This does NOT require a fresh tracker fetch — ServerStatus is carried in the msg.
 		_ = m.store.Mutate(func(s *state.State) error {
 			if t, ok := s.Tickets[msg.ticketID]; ok {
-				t.LastKnownStatus = msg.serverStatus
+				t.Status = msg.serverStatus
 				s.Tickets[msg.ticketID] = t
 			}
 			return nil
@@ -147,8 +146,7 @@ func (m Model) handlePushResult(msg pushResultMsg) (Model, tea.Cmd) {
 		snap, rev := m.store.Snapshot()
 		m.snapshot = snap
 		m.snapshotRev = rev
-		m.board = snap.Board
-		mapped, unmapped := resolveTickets(snap)
+		mapped, unmapped := resolveTicketsWithBoard(m.board, snap)
 		m.tickets = flattenMapped(m.board, mapped)
 		m.unmappedTickets = unmapped
 
@@ -160,8 +158,7 @@ func (m Model) handlePushResult(msg pushResultMsg) (Model, tea.Cmd) {
 	snap, rev := m.store.Snapshot()
 	m.snapshot = snap
 	m.snapshotRev = rev
-	m.board = snap.Board
-	mapped, unmapped := resolveTickets(snap)
+	mapped, unmapped := resolveTicketsWithBoard(m.board, snap)
 	m.tickets = flattenMapped(m.board, mapped)
 	m.unmappedTickets = unmapped
 	return m, nil

@@ -165,7 +165,7 @@ func (m Model) buildFilteredTicketMap() map[string][]Ticket {
 	result := make(map[string][]Ticket)
 	query := m.filterQuery
 
-	mapped, _ := resolveTickets(m.snapshot)
+	mapped, _ := resolveTicketsWithBoard(m.board, m.snapshot)
 	for colID, tickets := range mapped {
 		for _, t := range tickets {
 			if query != "" {

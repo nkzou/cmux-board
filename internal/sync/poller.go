@@ -102,29 +102,11 @@ func poll(
 	}
 
 	// All state mutations go through store.Mutate — no direct assignment.
+	// NOTE: This poller is deprecated and will be deleted in M-6/T-602.
 	return store.Mutate(func(s *state.State) error {
 		MergePulledTickets(s, tickets)
-		// Board snapshot is tracker-owned with no local-only fields — full overwrite is correct.
-		s.Board = state.BoardSnapshot{
-			BoardID:   board.ID,
-			BoardName: board.Name,
-			Columns:   convertColumns(board.Columns),
-		}
-		now := time.Now()
-		s.LastPulledAt = &now
+		_ = board // board layout not stored in State (schema v3; UI rewritten in M-4)
 		return nil
 	})
 }
 
-// convertColumns maps tracker.Column to state.ColumnSnapshot.
-func convertColumns(cols []tracker.Column) []state.ColumnSnapshot {
-	out := make([]state.ColumnSnapshot, len(cols))
-	for i, c := range cols {
-		out[i] = state.ColumnSnapshot{
-			ID:        c.ID,
-			Name:      c.Name,
-			StatusIDs: c.StatusIDs,
-		}
-	}
-	return out
-}

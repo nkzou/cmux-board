@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/nkzou/cmux-board/internal/state"
 )
@@ -122,20 +121,19 @@ func TestRemoveRepo_RefusedByActivation(t *testing.T) {
 	}
 }
 
-func TestRemoveRepo_RemovedAtTicketIncluded(t *testing.T) {
+func TestRemoveRepo_AssignedTicketIncluded(t *testing.T) {
 	cfg := makeConfig(map[string]RepoEntry{
 		"bar": {Name: "Bar", Path: "/tmp/bar", DefaultBranch: "main"},
 	})
-	removedAt := time.Now()
 	st := makeState(
 		map[string]state.TicketState{
-			"PROJ-99": {Key: "PROJ-99", AssignedRepoIDs: []string{"bar"}, RemovedAt: &removedAt},
+			"PROJ-99": {Key: "PROJ-99", Source: "jira", AssignedRepoIDs: []string{"bar"}},
 		},
 		nil,
 	)
 	err := RemoveRepo(cfg, st, "bar")
 	if !errors.Is(err, ErrRepoReferenced) {
-		t.Errorf("expected ErrRepoReferenced (removed_at ticket), got %v", err)
+		t.Errorf("expected ErrRepoReferenced (assigned ticket), got %v", err)
 	}
 	if err != nil && !containsStr(err.Error(), "PROJ-99") {
 		t.Errorf("error message should mention 'PROJ-99', got: %v", err)

@@ -13,6 +13,7 @@ import (
 )
 
 // buildDragModel builds a Model with a seeded board and ticket for drag tests.
+// Board layout is seeded directly on the model (not on State, schema v3).
 func buildDragModel(t *testing.T) Model {
 	t.Helper()
 	dir := t.TempDir()
@@ -24,18 +25,10 @@ func buildDragModel(t *testing.T) Model {
 	now := time.Now()
 	if err := store.Mutate(func(s *state.State) error {
 		s.Tickets["PROJ-1"] = state.TicketState{
-			Key:             "PROJ-1",
-			Summary:         "Test ticket",
-			Status:          "To Do",
-			LastKnownStatus: "To Do",
-			UpdatedAt:       &now,
-		}
-		s.Board = state.BoardSnapshot{
-			Columns: []state.ColumnSnapshot{
-				{ID: "col-todo", Name: "To Do", StatusIDs: []string{"To Do"}},
-				{ID: "col-inprogress", Name: "In Progress", StatusIDs: []string{"In Progress"}},
-				{ID: "col-done", Name: "Done", StatusIDs: []string{"Done"}},
-			},
+			Key:       "PROJ-1",
+			Summary:   "Test ticket",
+			Status:    "To Do",
+			UpdatedAt: &now,
 		}
 		return nil
 	}); err != nil {
@@ -44,6 +37,14 @@ func buildDragModel(t *testing.T) Model {
 
 	cfg := &config.Config{SchemaVersion: config.SchemaVersionCurrent}
 	m := NewModelWithContext(context.Background(), cfg, store)
+	// Seed board layout directly on the model (schema v3: board not in State).
+	m.board = state.BoardSnapshot{
+		Columns: []state.ColumnSnapshot{
+			{ID: "col-todo", Name: "To Do", StatusIDs: []string{"To Do"}},
+			{ID: "col-inprogress", Name: "In Progress", StatusIDs: []string{"In Progress"}},
+			{ID: "col-done", Name: "Done", StatusIDs: []string{"Done"}},
+		},
+	}
 	return m
 }
 
@@ -61,9 +62,9 @@ func TestDrag_SnapBackOnConflict(t *testing.T) {
 
 	// After optimistic move, ticket should be at "In Progress".
 	snap, _ := m.store.Snapshot()
-	if snap.Tickets["PROJ-1"].LastKnownStatus != "In Progress" {
-		t.Errorf("after optimistic move: LastKnownStatus got %q, want %q",
-			snap.Tickets["PROJ-1"].LastKnownStatus, "In Progress")
+	if snap.Tickets["PROJ-1"].Status != "In Progress" {
+		t.Errorf("after optimistic move: Status got %q, want %q",
+			snap.Tickets["PROJ-1"].Status, "In Progress")
 	}
 
 	// Inject PushConflict result (server says ticket is at "To Do").
@@ -77,9 +78,9 @@ func TestDrag_SnapBackOnConflict(t *testing.T) {
 
 	// Ticket must be snapped back to "To Do".
 	snap2, _ := m.store.Snapshot()
-	if snap2.Tickets["PROJ-1"].LastKnownStatus != "To Do" {
-		t.Errorf("after snap-back: LastKnownStatus got %q, want %q",
-			snap2.Tickets["PROJ-1"].LastKnownStatus, "To Do")
+	if snap2.Tickets["PROJ-1"].Status != "To Do" {
+		t.Errorf("after snap-back: Status got %q, want %q",
+			snap2.Tickets["PROJ-1"].Status, "To Do")
 	}
 	// Toast should be in the queue.
 	if len(m.toasts) == 0 {
@@ -101,21 +102,21 @@ func TestDrag_OptimisticMoveAndCommitOnSuccess(t *testing.T) {
 
 	// Optimistic move applied.
 	snap, _ := m.store.Snapshot()
-	if snap.Tickets["PROJ-1"].LastKnownStatus != "In Progress" {
-		t.Errorf("optimistic: got %q, want In Progress", snap.Tickets["PROJ-1"].LastKnownStatus)
+	if snap.Tickets["PROJ-1"].Status != "In Progress" {
+		t.Errorf("optimistic: got %q, want In Progress", snap.Tickets["PROJ-1"].Status)
 	}
 
 	// Simulate successful push (sync.Push already committed via Mutate).
 	m, _ = m.handlePushResult(pushResultMsg{
-		ticketID:  "PROJ-1",
+		ticketID:   "PROJ-1",
 		fromColumn: "col-todo",
-		newStatus: "In Progress",
+		newStatus:  "In Progress",
 	})
 
 	// Snapshot should still reflect In Progress.
 	snap2, _ := m.store.Snapshot()
-	if snap2.Tickets["PROJ-1"].LastKnownStatus != "In Progress" {
-		t.Errorf("after success: got %q, want In Progress", snap2.Tickets["PROJ-1"].LastKnownStatus)
+	if snap2.Tickets["PROJ-1"].Status != "In Progress" {
+		t.Errorf("after success: got %q, want In Progress", snap2.Tickets["PROJ-1"].Status)
 	}
 	// No error toasts.
 	if len(m.toasts) != 0 {
@@ -133,9 +134,9 @@ func TestDrag_NoopOnSameColumn(t *testing.T) {
 	m.dragTargetColumn = "col-todo"
 
 	storeMutateCalled := false
-	// We verify by checking that LastKnownStatus is unchanged after drop.
+	// Verify that Status is unchanged after drop.
 	snapBefore, _ := m.store.Snapshot()
-	beforeStatus := snapBefore.Tickets["PROJ-1"].LastKnownStatus
+	beforeStatus := snapBefore.Tickets["PROJ-1"].Status
 
 	m, cmd := m.dropTicket()
 
@@ -148,25 +149,20 @@ func TestDrag_NoopOnSameColumn(t *testing.T) {
 		t.Error("expected nil cmd for same-column drop (no-op)")
 	}
 	snapAfter, _ := m.store.Snapshot()
-	if snapAfter.Tickets["PROJ-1"].LastKnownStatus != beforeStatus {
-		t.Errorf("status changed on same-column drop: %q → %q", beforeStatus, snapAfter.Tickets["PROJ-1"].LastKnownStatus)
+	if snapAfter.Tickets["PROJ-1"].Status != beforeStatus {
+		t.Errorf("status changed on same-column drop: %q -> %q", beforeStatus, snapAfter.Tickets["PROJ-1"].Status)
 	}
 	_ = storeMutateCalled
 }
 
 func TestDrag_StateMutationOnlyThroughMutate(t *testing.T) {
 	// Verify that the push success path uses store.Mutate to persist the new status.
-	// We do this by injecting a conflict-then-success sequence and checking that
-	// the store reflects the committed status.
 	m := buildDragModel(t)
 
-	// Simulate a push result message arriving (after goroutine returns).
-	// On success, sync.Push would have already called store.Mutate. We replicate
-	// the state that sync.Push leaves: status already updated in the store before
-	// handlePushResult is called.
+	// Simulate state that sync.Push leaves after a successful transition.
 	if err := m.store.Mutate(func(s *state.State) error {
 		if t2, ok := s.Tickets["PROJ-1"]; ok {
-			t2.LastKnownStatus = "Done"
+			t2.Status = "Done"
 			s.Tickets["PROJ-1"] = t2
 		}
 		return nil
@@ -175,19 +171,19 @@ func TestDrag_StateMutationOnlyThroughMutate(t *testing.T) {
 	}
 
 	m, _ = m.handlePushResult(pushResultMsg{
-		ticketID:  "PROJ-1",
+		ticketID:   "PROJ-1",
 		fromColumn: "col-todo",
-		newStatus: "Done",
+		newStatus:  "Done",
 	})
 
-	// Store must reflect "Done" — set by the explicit Mutate above + refresh in handlePushResult.
+	// Store must reflect "Done".
 	snap, _ := m.store.Snapshot()
-	if snap.Tickets["PROJ-1"].LastKnownStatus != "Done" {
-		t.Errorf("LastKnownStatus got %q, want Done", snap.Tickets["PROJ-1"].LastKnownStatus)
+	if snap.Tickets["PROJ-1"].Status != "Done" {
+		t.Errorf("Status got %q, want Done", snap.Tickets["PROJ-1"].Status)
 	}
 }
 
-// mockTracker is a minimal tracker.IssueTracker mock for drag tests.
+// mockTrackerForDrag is a minimal tracker.IssueTracker mock for drag tests.
 type mockTrackerForDrag struct {
 	transitionStatus func(ctx context.Context, ticketID, from, to string) error
 }
@@ -222,9 +218,9 @@ func TestDrag_PushCalledAsynchronously(t *testing.T) {
 	now := time.Now()
 	store.Mutate(func(s *state.State) error { //nolint:errcheck
 		s.Tickets["PROJ-1"] = state.TicketState{
-			Key:             "PROJ-1",
-			LastKnownStatus: "To Do",
-			UpdatedAt:       &now,
+			Key:       "PROJ-1",
+			Status:    "To Do",
+			UpdatedAt: &now,
 		}
 		return nil
 	})
@@ -267,7 +263,7 @@ func TestDrag_ConflictSnapBackUsesServerStatus(t *testing.T) {
 	// Force optimistic move to "In Progress".
 	m.store.Mutate(func(s *state.State) error { //nolint:errcheck
 		if tk, ok := s.Tickets["PROJ-1"]; ok {
-			tk.LastKnownStatus = "In Progress"
+			tk.Status = "In Progress"
 			s.Tickets["PROJ-1"] = tk
 		}
 		return nil
@@ -286,7 +282,7 @@ func TestDrag_ConflictSnapBackUsesServerStatus(t *testing.T) {
 	})
 
 	snap, _ := m.store.Snapshot()
-	if snap.Tickets["PROJ-1"].LastKnownStatus != "To Do" {
-		t.Errorf("snap-back got %q, want To Do", snap.Tickets["PROJ-1"].LastKnownStatus)
+	if snap.Tickets["PROJ-1"].Status != "To Do" {
+		t.Errorf("snap-back got %q, want To Do", snap.Tickets["PROJ-1"].Status)
 	}
 }

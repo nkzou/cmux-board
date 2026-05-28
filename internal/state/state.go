@@ -3,32 +3,31 @@ package state
 import "time"
 
 // SchemaVersionCurrent is the only schema version written by this binary.
-const SchemaVersionCurrent = 2
+const SchemaVersionCurrent = 3
 
 // State is stored at ~/.config/cmux-board/state.json (mode 0644).
 type State struct {
 	SchemaVersion int                          `json:"schema_version"`
 	Tickets       map[string]TicketState       `json:"tickets,omitempty"`     // keyed by ticket key
 	Activations   map[string][]ActivationEntry `json:"activations,omitempty"` // keyed by ticket key
-	Board         BoardSnapshot                `json:"board,omitempty"`
-	LastPulledAt  *time.Time                   `json:"last_pulled_at,omitempty"`
 }
 
 // TicketState holds per-ticket cached data from the tracker plus local-only fields.
+// Source is "jira" for imported tickets and "local" for user-created local tickets.
 type TicketState struct {
-	Key             string         `json:"key"`
-	Summary         string         `json:"summary"`
-	Status          string         `json:"status"`             // tracker-owned
-	LastKnownStatus string         `json:"last_known_status"`  // used for OCC expected_from
-	AssigneeID      string         `json:"assignee_id,omitempty"`
-	Labels          []string       `json:"labels,omitempty"`
-	Priority        string         `json:"priority,omitempty"`
-	URL             string         `json:"url,omitempty"`
-	UpdatedAt       *time.Time     `json:"updated_at,omitempty"`
-	Raw             map[string]any `json:"raw,omitempty"`       // tracker escape hatch
-	// Local-only fields — preserved across polls (never overwritten by tracker data):
+	Key             string     `json:"key"`
+	Source          string     `json:"source"`                 // "jira" | "local"
+	Summary         string     `json:"summary,omitempty"`
+	Status          string     `json:"status,omitempty"`        // Jira-mirrored; empty for local tickets
+	LocalStatus     string     `json:"local_status,omitempty"` // local tickets only
+	Priority        string     `json:"priority,omitempty"`
+	AssigneeID      string     `json:"assignee_id,omitempty"`
+	URL             string     `json:"url,omitempty"`           // used by activate.go:186
+	Labels          []string   `json:"labels,omitempty"`
+	X               int        `json:"x"`
+	Y               int        `json:"y"`
 	AssignedRepoIDs []string   `json:"assigned_repo_ids,omitempty"`
-	RemovedAt       *time.Time `json:"removed_at,omitempty"` // set when ticket leaves pulled set
+	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
 }
 
 // ActivationEntry is one (ticket, repo) activation journal entry.
@@ -53,7 +52,7 @@ type ActivationEntry struct {
 	// Journal step tracking (Codex Finding 5)
 	Step     string `json:"step"`     // "started"|"worktree_created"|"claude_started"|"cmux_created"
 	Complete bool   `json:"complete"` // false until all 3 side effects journaled
-	CreatedAt    time.Time  `json:"created_at"`
+	CreatedAt     time.Time  `json:"created_at"`
 	LastFocusedAt *time.Time `json:"last_focused_at,omitempty"`
 	// Orphan flags
 	ClaudeOrphan bool `json:"claude_orphan,omitempty"`
@@ -71,6 +70,8 @@ const (
 )
 
 // BoardSnapshot caches the last-known board layout.
+// Retained as a standalone type for internal/sync/ (deleted in M-6/T-602) and
+// internal/ui/ (rewritten in M-4). Not stored on State in schema v3.
 type BoardSnapshot struct {
 	BoardID   string           `json:"board_id,omitempty"`
 	BoardName string           `json:"board_name,omitempty"`
@@ -78,13 +79,15 @@ type BoardSnapshot struct {
 }
 
 // ColumnSnapshot caches one board column's layout.
+// Retained as a standalone type for internal/sync/ (deleted in M-6/T-602) and
+// internal/ui/ (rewritten in M-4). Not stored on State in schema v3.
 type ColumnSnapshot struct {
 	ID        string   `json:"id"`
 	Name      string   `json:"name"`
 	StatusIDs []string `json:"status_ids,omitempty"`
 }
 
-// DefaultState returns an empty State with SchemaVersion 2.
+// DefaultState returns an empty State with the current schema version.
 func DefaultState() State {
 	return State{
 		SchemaVersion: SchemaVersionCurrent,

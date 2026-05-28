@@ -31,10 +31,11 @@ func makeTestModelWithBoard(t *testing.T, numCols, ticketsPerCol int) Model {
 		}
 	}
 
-	// Write initial state.
+	// Write initial state (tickets only; board layout is not stored on State in schema v3).
 	err = store.Mutate(func(s *state.State) error {
-		s.Board = state.BoardSnapshot{Columns: columns}
-		s.Tickets = tickets
+		for k, v := range tickets {
+			s.Tickets[k] = v
+		}
 		return nil
 	})
 	if err != nil {
@@ -43,7 +44,9 @@ func makeTestModelWithBoard(t *testing.T, numCols, ticketsPerCol int) Model {
 
 	cfg := &config.Config{SchemaVersion: config.SchemaVersionCurrent}
 	m := NewModel(cfg, store)
-	// Refresh so board and tickets slices are populated.
+	// Set board layout directly on the model (schema v3: board not stored on State).
+	m.board = state.BoardSnapshot{Columns: columns}
+	// Refresh so ticket slices are populated.
 	m, _ = m.refreshSnapshot()
 	return m
 }
@@ -166,9 +169,6 @@ func TestHandleNormalMode_ManageOneRepo(t *testing.T) {
 		t.Fatalf("state.Open: %v", err)
 	}
 	if err := store.Mutate(func(s *state.State) error {
-		s.Board = state.BoardSnapshot{Columns: []state.ColumnSnapshot{
-			{ID: "col", Name: "Col", StatusIDs: []string{"todo"}},
-		}}
 		s.Tickets["T-1"] = state.TicketState{Key: "T-1", Status: "todo", AssignedRepoIDs: []string{"repo-a"}}
 		return nil
 	}); err != nil {
@@ -179,6 +179,9 @@ func TestHandleNormalMode_ManageOneRepo(t *testing.T) {
 		Repos:         map[string]config.RepoEntry{"repo-a": {ID: "repo-a", Name: "Repo A"}},
 	}
 	m := NewModel(cfg, store)
+	m.board = state.BoardSnapshot{Columns: []state.ColumnSnapshot{
+		{ID: "col", Name: "Col", StatusIDs: []string{"todo"}},
+	}}
 	m, _ = m.refreshSnapshot()
 
 	next, _ := m.handleNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(KeyManage)})
@@ -205,9 +208,6 @@ func TestHandleNormalMode_ManageMultiRepo(t *testing.T) {
 		t.Fatalf("state.Open: %v", err)
 	}
 	if err := store.Mutate(func(s *state.State) error {
-		s.Board = state.BoardSnapshot{Columns: []state.ColumnSnapshot{
-			{ID: "col", Name: "Col", StatusIDs: []string{"todo"}},
-		}}
 		s.Tickets["T-1"] = state.TicketState{Key: "T-1", Status: "todo", AssignedRepoIDs: []string{"repo-a", "repo-b"}}
 		return nil
 	}); err != nil {
@@ -221,6 +221,9 @@ func TestHandleNormalMode_ManageMultiRepo(t *testing.T) {
 		},
 	}
 	m := NewModel(cfg, store)
+	m.board = state.BoardSnapshot{Columns: []state.ColumnSnapshot{
+		{ID: "col", Name: "Col", StatusIDs: []string{"todo"}},
+	}}
 	m, _ = m.refreshSnapshot()
 
 	next, _ := m.handleNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(KeyManage)})

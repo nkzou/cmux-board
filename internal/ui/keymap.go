@@ -400,6 +400,6 @@ func (m Model) ticketsInCol(colID string) []state.TicketState {
 	if m.snapshot == nil {
 		return nil
 	}
-	mapped, _ := resolveTickets(m.snapshot)
+	mapped, _ := resolveTicketsWithBoard(m.board, m.snapshot)
 	return mapped[colID]
 }

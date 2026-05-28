@@ -75,9 +75,10 @@ func (m Model) refreshSnapshot() (Model, tea.Cmd) {
 	snap, rev := m.store.Snapshot()
 	m.snapshot = snap
 	m.snapshotRev = rev
-	m.board = snap.Board
+	// Board layout not stored on State in schema v3; m.board retains last-set value.
+	// M-4 will provide board layout via the spatial layer.
 
-	mapped, unmapped := resolveTickets(snap)
+	mapped, unmapped := resolveTicketsWithBoard(m.board, snap)
 	m.tickets = flattenMapped(m.board, mapped)
 	m.unmappedTickets = unmapped
 

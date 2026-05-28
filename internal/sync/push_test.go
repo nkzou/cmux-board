@@ -37,7 +37,7 @@ func (m *mockTracker) Capabilities() tracker.Capabilities {
 }
 
 // seedStore creates a store with PROJ-42 at the given lastKnownStatus.
-func seedStore(t *testing.T, lastKnownStatus string) *state.Store {
+func seedStore(t *testing.T, status string) *state.Store {
 	t.Helper()
 	store, err := state.Open(t.TempDir() + "/state.json")
 	if err != nil {
@@ -45,9 +45,8 @@ func seedStore(t *testing.T, lastKnownStatus string) *state.Store {
 	}
 	_ = store.Mutate(func(s *state.State) error {
 		s.Tickets["PROJ-42"] = state.TicketState{
-			Key:             "PROJ-42",
-			Status:          lastKnownStatus,
-			LastKnownStatus: lastKnownStatus,
+			Key:    "PROJ-42",
+			Status: status,
 		}
 		return nil
 	})
@@ -74,9 +73,6 @@ func TestPush_HappyPath(t *testing.T) {
 	got := snap.Tickets["PROJ-42"]
 	if got.Status != "Done" {
 		t.Errorf("TC-1: Status: want %q, got %q", "Done", got.Status)
-	}
-	if got.LastKnownStatus != "Done" {
-		t.Errorf("TC-1: LastKnownStatus: want %q, got %q", "Done", got.LastKnownStatus)
 	}
 }
 
@@ -209,9 +205,6 @@ func TestPush_DryRun_NoStateMutation(t *testing.T) {
 	got := snap.Tickets["PROJ-42"]
 	if got.Status != "In Progress" {
 		t.Errorf("TC-DR2: Status: want %q (unchanged), got %q", "In Progress", got.Status)
-	}
-	if got.LastKnownStatus != "In Progress" {
-		t.Errorf("TC-DR2: LastKnownStatus: want %q (unchanged), got %q", "In Progress", got.LastKnownStatus)
 	}
 }
 

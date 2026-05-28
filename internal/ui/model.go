@@ -111,7 +111,8 @@ func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.S
 		store:             store,
 		snapshot:          snap,
 		snapshotRev:       rev,
-		board:             snap.Board,
+		// Board layout not stored on State in schema v3; M-4 provides board via spatial layer.
+		board:             state.BoardSnapshot{},
 		mode:              ModeNormal,
 		approachNameInput: input,
 		filterInput:       fi,

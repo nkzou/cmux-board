@@ -42,10 +42,6 @@ func Resolve(
 	mapped = make(map[string][]state.TicketState)
 
 	for _, t := range tickets {
-		// Skip soft-deleted tickets.
-		if t.RemovedAt != nil {
-			continue
-		}
 		if colID, ok := statusToCol[strings.ToLower(t.Status)]; ok {
 			mapped[colID] = append(mapped[colID], t)
 		} else {

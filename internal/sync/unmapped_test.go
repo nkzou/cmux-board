@@ -2,7 +2,6 @@ package sync
 
 import (
 	"testing"
-	"time"
 
 	"github.com/nkzou/cmux-board/internal/state"
 )
@@ -72,26 +71,29 @@ func TestResolve_AllUnmapped(t *testing.T) {
 	}
 }
 
-// TC-4: removed tickets excluded from both outputs.
-func TestResolve_RemovedTicketsExcluded(t *testing.T) {
+// TC-4: ticket with unknown status appears in unmapped bucket.
+func TestResolve_UnknownStatusUnmapped(t *testing.T) {
 	board := makeBoard("in-progress", []string{"In Progress"})
-	removedAt := time.Now()
 	tickets := map[string]state.TicketState{
-		"PROJ-42": {Key: "PROJ-42", Status: "In Progress", RemovedAt: &removedAt},
+		"PROJ-42": {Key: "PROJ-42", Status: "Backlog"}, // not in any column
 	}
 	mapped, unmapped := Resolve(board, tickets)
 
 	for _, v := range mapped {
 		for _, ticket := range v {
 			if ticket.Key == "PROJ-42" {
-				t.Error("TC-4: PROJ-42 (removed) must not appear in mapped")
+				t.Error("TC-4: PROJ-42 (unknown status) must not appear in mapped")
 			}
 		}
 	}
+	found := false
 	for _, ticket := range unmapped {
 		if ticket.Key == "PROJ-42" {
-			t.Error("TC-4: PROJ-42 (removed) must not appear in unmapped")
+			found = true
 		}
+	}
+	if !found {
+		t.Error("TC-4: PROJ-42 (unknown status) must appear in unmapped")
 	}
 }
 

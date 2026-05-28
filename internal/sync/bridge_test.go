@@ -12,7 +12,7 @@ import (
 )
 
 // TestBridgePushOKMsg: PushIntent on channel → success → PushOKMsg on ResultCh;
-// state.Store last_known_status is updated.
+// state.Store Status is updated.
 func TestBridgePushOKMsg(t *testing.T) {
 	store := seedStore(t, "To Do")
 	tr := &mockTracker{}
@@ -40,14 +40,14 @@ func TestBridgePushOKMsg(t *testing.T) {
 	}
 
 	snap, _ := store.Snapshot()
-	if snap.Tickets["PROJ-42"].LastKnownStatus != "In Progress" {
-		t.Errorf("LastKnownStatus = %q, want %q",
-			snap.Tickets["PROJ-42"].LastKnownStatus, "In Progress")
+	if snap.Tickets["PROJ-42"].Status != "In Progress" {
+		t.Errorf("Status = %q, want %q",
+			snap.Tickets["PROJ-42"].Status, "In Progress")
 	}
 }
 
 // TestBridgePushConflictMsg: tracker returns ErrConflict → PushConflictMsg;
-// state.Store is NOT mutated (last_known_status stays at original value).
+// state.Store is NOT mutated (Status stays at original value).
 func TestBridgePushConflictMsg(t *testing.T) {
 	store := seedStore(t, "To Do")
 	tr := &mockTracker{transitionErr: tracker.ErrConflict}
@@ -70,9 +70,9 @@ func TestBridgePushConflictMsg(t *testing.T) {
 
 	// No state mutation should have occurred.
 	snap, _ := store.Snapshot()
-	if snap.Tickets["PROJ-42"].LastKnownStatus != "To Do" {
-		t.Errorf("LastKnownStatus mutated on conflict: got %q, want %q",
-			snap.Tickets["PROJ-42"].LastKnownStatus, "To Do")
+	if snap.Tickets["PROJ-42"].Status != "To Do" {
+		t.Errorf("Status mutated on conflict: got %q, want %q",
+			snap.Tickets["PROJ-42"].Status, "To Do")
 	}
 }
 

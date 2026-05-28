@@ -28,7 +28,7 @@ type Result struct {
 	// no tracker call is made and no state is mutated; the UI must snap the card
 	// back to its prior column and surface a non-modal toast.
 	// INVARIANT: when DryRun==true, Conflict==false and ServerStatus is the
-	// pre-push LastKnownStatus (so the UI has a snap-back target without inferring it).
+	// pre-push Status (so the UI has a snap-back target without inferring it).
 	DryRun bool
 }
 
@@ -62,7 +62,8 @@ func Push(
 	if !ok {
 		return Result{}, fmt.Errorf("push: ticket %q not found in state", ticketID)
 	}
-	expectedFrom := ticket.LastKnownStatus
+	// Use Status as the expected-from value (schema v3: LastKnownStatus removed).
+	expectedFrom := ticket.Status
 
 	// Dry-run gate — MUST run before any tracker.TransitionStatus call.
 	// No tracker method is invoked and no state.Store.Mutate is issued.
@@ -110,7 +111,6 @@ func Push(
 	mutErr := store.Mutate(func(s *state.State) error {
 		if t, ok := s.Tickets[ticketID]; ok {
 			t.Status = targetStatus
-			t.LastKnownStatus = targetStatus
 			s.Tickets[ticketID] = t
 		}
 		return nil

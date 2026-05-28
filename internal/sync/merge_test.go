@@ -3,18 +3,19 @@ package sync
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/nkzou/cmux-board/internal/state"
 	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
-// TC-1: tracker-owned fields overwritten; local-only (assigned_repo_ids) preserved.
+// TC-1: tracker-owned fields overwritten; local-only (assigned_repo_ids, x, y) preserved.
 func TestMergePulledTickets_TrackerFieldsOverwritten(t *testing.T) {
 	s := state.DefaultState()
 	s.Tickets["PROJ-42"] = state.TicketState{
 		Key:             "PROJ-42",
 		Summary:         "old",
+		X:               3,
+		Y:               5,
 		AssignedRepoIDs: []string{"my-service"},
 	}
 
@@ -30,44 +31,47 @@ func TestMergePulledTickets_TrackerFieldsOverwritten(t *testing.T) {
 	if len(got.AssignedRepoIDs) != 1 || got.AssignedRepoIDs[0] != "my-service" {
 		t.Errorf("TC-1: AssignedRepoIDs: want [\"my-service\"], got %v", got.AssignedRepoIDs)
 	}
+	// Local position must be preserved across poll.
+	if got.X != 3 || got.Y != 5 {
+		t.Errorf("TC-1: (X,Y): want (3,5), got (%d,%d)", got.X, got.Y)
+	}
 }
 
-// TC-2: ticket removed from pulled set → removed_at stamped exactly once.
-func TestMergePulledTickets_RemovedAtStampedOnce(t *testing.T) {
+// TC-2: ticket absent from pulled set is kept in state (historical resolution).
+func TestMergePulledTickets_AbsentTicketRetained(t *testing.T) {
 	s := state.DefaultState()
 	s.Tickets["PROJ-42"] = state.TicketState{Key: "PROJ-42", Status: "Open"}
 
-	// First empty pull: should stamp removed_at.
+	// Empty pull — PROJ-42 absent.
 	MergePulledTickets(&s, []tracker.Ticket{})
-	first := s.Tickets["PROJ-42"]
-	if first.RemovedAt == nil {
-		t.Fatal("TC-2: removed_at should be set after first empty pull")
-	}
-	firstTS := *first.RemovedAt
 
-	// Second empty pull: should NOT overwrite removed_at.
-	MergePulledTickets(&s, []tracker.Ticket{})
-	second := s.Tickets["PROJ-42"]
-	if second.RemovedAt == nil {
-		t.Fatal("TC-2: removed_at must remain set after second empty pull")
-	}
-	if !second.RemovedAt.Equal(firstTS) {
-		t.Errorf("TC-2: removed_at overwritten: want %v, got %v", firstTS, *second.RemovedAt)
+	if _, ok := s.Tickets["PROJ-42"]; !ok {
+		t.Error("TC-2: absent ticket should be retained in state for historical resolution")
 	}
 }
 
-// TC-3: removed ticket reappears → removed_at cleared.
-func TestMergePulledTickets_ReappearedTicketClearsRemovedAt(t *testing.T) {
+// TC-3: ticket reappears after absence — tracker-owned fields updated.
+func TestMergePulledTickets_ReappearedTicketUpdated(t *testing.T) {
 	s := state.DefaultState()
-	someTime := time.Now().Add(-time.Hour)
-	s.Tickets["PROJ-42"] = state.TicketState{Key: "PROJ-42", RemovedAt: &someTime}
+	s.Tickets["PROJ-42"] = state.TicketState{Key: "PROJ-42", Status: "Open", X: 2, Y: 4}
 
-	pulled := []tracker.Ticket{{Key: "PROJ-42", Summary: "back", Status: "Open"}}
+	// Empty pull — PROJ-42 not in pulled set.
+	MergePulledTickets(&s, []tracker.Ticket{})
+
+	// Ticket reappears with new summary/status.
+	pulled := []tracker.Ticket{{Key: "PROJ-42", Summary: "back", Status: "In Progress"}}
 	MergePulledTickets(&s, pulled)
 
 	got := s.Tickets["PROJ-42"]
-	if got.RemovedAt != nil {
-		t.Errorf("TC-3: removed_at should be nil after ticket reappears, got %v", got.RemovedAt)
+	if got.Summary != "back" {
+		t.Errorf("TC-3: Summary: want %q, got %q", "back", got.Summary)
+	}
+	if got.Status != "In Progress" {
+		t.Errorf("TC-3: Status: want %q, got %q", "In Progress", got.Status)
+	}
+	// Position preserved across re-appearance.
+	if got.X != 2 || got.Y != 4 {
+		t.Errorf("TC-3: (X,Y): want (2,4), got (%d,%d)", got.X, got.Y)
 	}
 }
 
@@ -110,8 +114,8 @@ func TestMergePulledTickets_E3Sequence(t *testing.T) {
 	})
 
 	got := s.Tickets["PROJ-42"]
-	if got.LastKnownStatus != "Done" {
-		t.Errorf("TC-5: LastKnownStatus: want %q, got %q", "Done", got.LastKnownStatus)
+	if got.Status != "Done" {
+		t.Errorf("TC-5: Status: want %q, got %q", "Done", got.Status)
 	}
 	if len(got.AssignedRepoIDs) != 1 || got.AssignedRepoIDs[0] != "my-service" {
 		t.Errorf("TC-5: AssignedRepoIDs: want [\"my-service\"], got %v", got.AssignedRepoIDs)

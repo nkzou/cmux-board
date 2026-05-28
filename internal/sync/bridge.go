@@ -91,7 +91,7 @@ func (b *Bridge) handleIntent(
 		snap, _ := store.Snapshot()
 		serverStatus := intent.TargetStatus
 		if t, ok := snap.Tickets[intent.TicketID]; ok {
-			serverStatus = t.LastKnownStatus
+			serverStatus = t.Status
 		}
 		msg = PushConflictMsg{
 			TicketID:     intent.TicketID,
