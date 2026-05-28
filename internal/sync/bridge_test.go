@@ -163,6 +163,9 @@ func (m *bridgePollMockTracker) GetBoard(_ context.Context, _ string) (tracker.B
 func (m *bridgePollMockTracker) ListTickets(_ context.Context, _ string, _ *time.Time) ([]tracker.Ticket, error) {
 	return m.tickets, nil
 }
+func (m *bridgePollMockTracker) GetTicket(_ context.Context, _ string) (tracker.Ticket, error) {
+	return tracker.Ticket{}, nil
+}
 func (m *bridgePollMockTracker) TransitionStatus(_ context.Context, _, _, _ string) error {
 	return nil
 }

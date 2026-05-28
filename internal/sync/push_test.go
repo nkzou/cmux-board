@@ -28,6 +28,9 @@ func (m *mockTracker) GetBoard(_ context.Context, _ string) (tracker.Board, erro
 func (m *mockTracker) ListTickets(_ context.Context, _ string, _ *time.Time) ([]tracker.Ticket, error) {
 	return nil, nil
 }
+func (m *mockTracker) GetTicket(_ context.Context, _ string) (tracker.Ticket, error) {
+	return tracker.Ticket{}, nil
+}
 func (m *mockTracker) TransitionStatus(_ context.Context, _, _, _ string) error {
 	m.transitionCalled = true
 	return m.transitionErr

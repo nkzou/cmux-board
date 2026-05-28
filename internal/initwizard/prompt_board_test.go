@@ -36,6 +36,9 @@ func (m *boardMockAdapter) GetBoard(ctx context.Context, boardID string) (tracke
 func (m *boardMockAdapter) ListTickets(ctx context.Context, boardID string, since *time.Time) ([]tracker.Ticket, error) {
 	return nil, errors.New("not implemented")
 }
+func (m *boardMockAdapter) GetTicket(_ context.Context, _ string) (tracker.Ticket, error) {
+	return tracker.Ticket{}, errors.New("not implemented")
+}
 func (m *boardMockAdapter) TransitionStatus(ctx context.Context, ticketID, expectedFromStatus, toStatus string) error {
 	return errors.New("not implemented")
 }

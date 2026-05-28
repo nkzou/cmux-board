@@ -107,6 +107,7 @@ type IssueTracker interface {
 	ListBoards(ctx context.Context) ([]BoardSummary, error)
 	GetBoard(ctx context.Context, boardID string) (Board, error)
 	ListTickets(ctx context.Context, boardID string, since *time.Time) ([]Ticket, error)
+	GetTicket(ctx context.Context, key string) (Ticket, error)
 	TransitionStatus(ctx context.Context, ticketID, expectedFromStatus, toStatus string) error
 	Capabilities() Capabilities
 }

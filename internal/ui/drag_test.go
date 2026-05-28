@@ -200,6 +200,9 @@ func (m *mockTrackerForDrag) GetBoard(_ context.Context, _ string) (tracker.Boar
 func (m *mockTrackerForDrag) ListTickets(_ context.Context, _ string, _ *time.Time) ([]tracker.Ticket, error) {
 	return nil, nil
 }
+func (m *mockTrackerForDrag) GetTicket(_ context.Context, _ string) (tracker.Ticket, error) {
+	return tracker.Ticket{}, nil
+}
 func (m *mockTrackerForDrag) TransitionStatus(ctx context.Context, ticketID, from, to string) error {
 	return m.transitionStatus(ctx, ticketID, from, to)
 }

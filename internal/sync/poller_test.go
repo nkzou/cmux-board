@@ -42,6 +42,9 @@ func (m *pollMockTracker) ListTickets(_ context.Context, _ string, _ *time.Time)
 	}
 	return []tracker.Ticket{{Key: "PROJ-1", Summary: "ticket", Status: "Open"}}, nil
 }
+func (m *pollMockTracker) GetTicket(_ context.Context, _ string) (tracker.Ticket, error) {
+	return tracker.Ticket{}, nil
+}
 func (m *pollMockTracker) TransitionStatus(_ context.Context, _, _, _ string) error { return nil }
 func (m *pollMockTracker) Capabilities() tracker.Capabilities                        { return tracker.Capabilities{} }
 
