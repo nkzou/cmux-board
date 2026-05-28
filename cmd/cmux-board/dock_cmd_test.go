@@ -81,6 +81,7 @@ func makeDockCmdWithDeps(deps dockDeps) *cobra.Command {
 	}
 	cmd.Flags().Bool("unsafe-creds", false, "")
 	cmd.Flags().String("log-level", "debug", "")
+	cmd.Flags().Bool("debug", false, "")
 	return cmd
 }
 
@@ -99,8 +100,8 @@ func passPreflightFn() func(ctx context.Context, cfg *config.Config, creds *conf
 }
 
 // immediateExitProgram returns a runProgram dep that exits immediately.
-func immediateExitProgram() func(context.Context, *config.Config, *state.Store, <-chan tea.Msg) error {
-	return func(_ context.Context, _ *config.Config, _ *state.Store, _ <-chan tea.Msg) error {
+func immediateExitProgram() func(context.Context, *config.Config, *state.Store, tracker.IssueTracker, <-chan tea.Msg, bool) error {
+	return func(_ context.Context, _ *config.Config, _ *state.Store, _ tracker.IssueTracker, _ <-chan tea.Msg, _ bool) error {
 		return nil
 	}
 }
@@ -335,7 +336,7 @@ func TestDockGracefulShutdownFlushesState(t *testing.T) {
 		},
 		reconcile:  noOpReconcile,
 		newTracker: noOpNewTracker,
-		runProgram: func(_ context.Context, _ *config.Config, st *state.Store, _ <-chan tea.Msg) error {
+		runProgram: func(_ context.Context, _ *config.Config, st *state.Store, _ tracker.IssueTracker, _ <-chan tea.Msg, _ bool) error {
 			// Verify state is accessible — simulate BubbleTea exit immediately.
 			return nil
 		},

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone"
 
 	"github.com/nkzou/cmux-board/internal/state"
@@ -78,13 +79,21 @@ func (m *Model) renderPostitCanvas() string {
 		// Split into card lines.
 		cardLines := strings.Split(marked, "\n")
 
-		// Splice each card line into the canvas at (ticket.X, ticket.Y + i).
+		// Use live drag position when this card is being dragged so motion is smooth.
+		// The committed (x, y) only changes on release; without this, the card would
+		// stay put until release and then snap to the new spot.
+		drawX, drawY := ticket.X, ticket.Y
+		if m.dragging != nil && m.dragging.key == k && m.dragging.motion {
+			drawX, drawY = m.dragging.currentX, m.dragging.currentY
+		}
+
+		// Splice each card line into the canvas at (drawX, drawY + i).
 		for i, cl := range cardLines {
-			y := ticket.Y + i
+			y := drawY + i
 			if y < 0 || y >= len(lines) {
 				continue
 			}
-			lines[y] = spliceLine(lines[y], ticket.X, cl, w)
+			lines[y] = spliceLine(lines[y], drawX, cl, w)
 		}
 	}
 
@@ -123,12 +132,21 @@ func (m *Model) reconcileZOrder(snap *state.State) {
 	m.zOrder = pruned
 
 	if m.selectedKey != "" && !inSnap[m.selectedKey] {
-		m.selectedKey = "" // chosen behavior: empty over auto-select top
+		m.selectedKey = ""
+	}
+	// Auto-select the topmost ticket when nothing is selected and tickets exist,
+	// so keyboard-driven actions (x, s, arrows, Enter) always have a target.
+	// Without this, a fresh user with no clicks can't trigger any keybind that
+	// requires a selection.
+	if m.selectedKey == "" && len(m.zOrder) > 0 {
+		m.selectedKey = m.zOrder[len(m.zOrder)-1]
 	}
 }
 
 // spliceLine inserts ins into dst at column atX, clipping to total width.
-// Columns are measured using lipgloss.Width to handle ANSI-escaped strings.
+// All slicing is cell-aware via ansi.Cut so a previously spliced card's
+// SGR escapes don't break when a second card is placed on the same row
+// (rune-counting was the bug: ANSI escape bytes shifted column math).
 func spliceLine(dst string, atX int, ins string, total int) string {
 	if atX < 0 {
 		atX = 0
@@ -142,37 +160,16 @@ func spliceLine(dst string, atX int, ins string, total int) string {
 		return dst
 	}
 
-	// Build prefix: first atX cells of dst.
-	// dst may contain ANSI escapes; use rune-level trimming for simplicity.
-	// (Post-its are positioned at terminal-cell units; plain spaces fill background.)
-	prefix := runeSlice(dst, 0, atX)
-
-	// Suffix: cells after the card's right edge, clamped to total.
 	endX := atX + insW
 	if endX > total {
+		ins = ansi.Truncate(ins, total-atX, "")
 		endX = total
 	}
-	suffix := runeSlice(dst, endX, total)
+
+	prefix := ansi.Cut(dst, 0, atX)
+	suffix := ansi.Cut(dst, endX, total)
 
 	return prefix + ins + suffix
-}
-
-// runeSlice returns the substring of s covering rune positions [start, end).
-// Unlike a plain byte slice, this handles multi-byte characters correctly.
-// ANSI escape sequences are treated as zero-width (best-effort; for plain
-// space-filled backgrounds this is accurate).
-func runeSlice(s string, start, end int) string {
-	runes := []rune(s)
-	if start < 0 {
-		start = 0
-	}
-	if end > len(runes) {
-		end = len(runes)
-	}
-	if start >= end {
-		return ""
-	}
-	return string(runes[start:end])
 }
 
 // centeredHint returns a string of the given canvas dimensions with a centered

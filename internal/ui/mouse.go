@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	zone "github.com/lrstanley/bubblezone"
 
@@ -22,10 +24,13 @@ import (
 func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Action {
 	case tea.MouseActionPress:
+		m.mousePressCount++
 		return m.handleMousePress(msg)
 	case tea.MouseActionMotion:
+		m.mouseMotionCount++
 		return m.handleMouseMotion(msg)
 	case tea.MouseActionRelease:
+		m.mouseReleaseCount++
 		return m.handleMouseRelease(msg)
 	}
 	return m, nil
@@ -37,28 +42,56 @@ func (m Model) handleMousePress(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Button != tea.MouseButtonLeft {
 		return m, nil
 	}
+	// Reconcile zOrder against the current snapshot before hit-testing.
+	// View() reconciles via a value-receiver copy that never reaches Update; without this
+	// the first MouseMsg sees an empty zOrder and no zone is hit, breaking click and drag.
+	if snap, _ := m.store.Snapshot(); snap != nil {
+		m.reconcileZOrder(snap)
+	}
 	// Find the topmost card that contains the cursor.
 	// Walk zOrder from the end (topmost) and check zone bounds.
 	key := ""
+	var dbg string
 	for i := len(m.zOrder) - 1; i >= 0; i-- {
 		k := m.zOrder[i]
 		if zone.DefaultManager != nil {
 			info := zone.Get(k)
-			if info != nil && !info.IsZero() && info.InBounds(msg) {
+			if info == nil {
+				dbg += fmt.Sprintf(" %s=nil", k)
+				continue
+			}
+			if info.IsZero() {
+				dbg += fmt.Sprintf(" %s=zero", k)
+				continue
+			}
+			dbg += fmt.Sprintf(" %s=(%d,%d)-(%d,%d)", k, info.StartX, info.StartY, info.EndX, info.EndY)
+			if info.InBounds(msg) {
 				key = k
 				break
 			}
 		}
 	}
 	if key == "" {
+		m.dragDebug = fmt.Sprintf("press@(%d,%d) MISS zones:%s", msg.X, msg.Y, dbg)
 		return m, nil
 	}
-	m.dragging = &dragState{
-		key:    key,
-		pressX: msg.X,
-		pressY: msg.Y,
-		motion: false,
+	// Seed live-drag position from the card's current (x, y) so the canvas can
+	// render it in place until motion arrives.
+	startX, startY := 0, 0
+	if snap, _ := m.store.Snapshot(); snap != nil {
+		if t, ok := snap.Tickets[key]; ok {
+			startX, startY = t.X, t.Y
+		}
 	}
+	m.dragging = &dragState{
+		key:      key,
+		pressX:   msg.X,
+		pressY:   msg.Y,
+		motion:   false,
+		currentX: startX,
+		currentY: startY,
+	}
+	m.dragDebug = fmt.Sprintf("press@(%d,%d) HIT=%s", msg.X, msg.Y, key)
 	return m, nil
 }
 
@@ -69,12 +102,23 @@ func (m Model) handleMouseMotion(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.dragging == nil {
 		return m, nil
 	}
-	if msg.X != m.dragging.pressX || msg.Y != m.dragging.pressY {
-		// Copy dragState to avoid aliased writes across old/new BubbleTea Model values.
-		ds := *m.dragging
-		ds.motion = true
-		m.dragging = &ds
+	if msg.X == m.dragging.pressX && msg.Y == m.dragging.pressY {
+		return m, nil
 	}
+	// Copy dragState to avoid aliased writes across old/new BubbleTea Model values.
+	ds := *m.dragging
+	ds.motion = true
+	// Recompute live position from the card's original (x, y) at press time.
+	// Use the snapshot to find the press-time origin; if the snapshot doesn't have
+	// the key (rare race), fall back to the previously computed currentX/Y.
+	if snap, _ := m.store.Snapshot(); snap != nil {
+		if t, ok := snap.Tickets[ds.key]; ok {
+			nx, ny := uispatial.ApplyDelta(t.X, t.Y, ds.pressX, ds.pressY, msg.X, msg.Y)
+			nx, ny = uispatial.Clamp(nx, ny, cardWidth(m.width), cardHeight(), m.width, m.height)
+			ds.currentX, ds.currentY = nx, ny
+		}
+	}
+	m.dragging = &ds
 	return m, nil
 }
 
@@ -99,16 +143,19 @@ func (m Model) handleMouseRelease(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if !motion {
 		// Click-release: select and activate.
 		m.selectedKey = key
+		m.dragDebug = fmt.Sprintf("release CLICK key=%s", key)
 		return m.tryActivate(key)
 	}
 
 	// Drag-release: compute clamped position and persist via store.Mutate.
 	snap := m.snapshot
 	if snap == nil {
+		m.dragDebug = "release DRAG snap=nil"
 		return m, nil
 	}
 	card, ok := snap.Tickets[key]
 	if !ok {
+		m.dragDebug = fmt.Sprintf("release DRAG missing key=%s", key)
 		return m, nil
 	}
 	newX, newY := uispatial.ApplyDelta(card.X, card.Y, pressX, pressY, msg.X, msg.Y)
@@ -118,12 +165,14 @@ func (m Model) handleMouseRelease(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		state.SetTicketPosition(s, key, newX, newY)
 		return nil
 	}); err != nil {
+		m.dragDebug = "release DRAG mutate-err: " + err.Error()
 		return m.pushToast("drag failed: " + err.Error())
 	}
 	snap2, rev := m.store.Snapshot()
 	m.snapshot = snap2
 	m.snapshotRev = rev
 
+	m.dragDebug = fmt.Sprintf("release DRAG key=%s (%d,%d)->(%d,%d)", key, card.X, card.Y, newX, newY)
 	return m, nil
 }
 

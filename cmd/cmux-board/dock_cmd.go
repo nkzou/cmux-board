@@ -34,6 +34,8 @@ func init() {
 		"bypass credentials.json mode-bit check (for development only)")
 	dockCmd.Flags().String("log-level", "info",
 		"log level: debug, info, warn, error")
+	dockCmd.Flags().Bool("debug", false,
+		"show mouse-event counters and last-drag diagnostic in the status bar")
 	rootCmd.AddCommand(dockCmd)
 }
 
@@ -58,8 +60,11 @@ type dockDeps struct {
 	newTracker func(cfg config.Config, creds config.Credentials) tracker.IssueTracker
 	// runProgram runs the BubbleTea program and returns when the user quits.
 	// resultCh, when non-nil, is drained and forwarded to the program via Send.
-	// Production passes bridge.ResultCh; tests pass nil (no-op).
-	runProgram func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error
+	// tr, when non-nil, is threaded into the Model so import-from-Jira can call GetTicket.
+	// debug, when true, surfaces mouse-event counters and the last-drag diagnostic
+	// in the status bar so terminal mouse pass-through can be inspected.
+	// Production passes bridge.ResultCh + the live tracker; tests pass nil.
+	runProgram func(ctx context.Context, cfg *config.Config, store *state.Store, tr tracker.IssueTracker, resultCh <-chan tea.Msg, debug bool) error
 	// logWriter is the underlying writer for the logger (nil = os.Stderr).
 	logWriter io.Writer
 }
@@ -101,8 +106,9 @@ func prodDockDeps() dockDeps {
 				Columns: trackerCols,
 			})
 		},
-		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error {
-			model := ui.NewModelWithContext(ctx, cfg, store)
+		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, tr tracker.IssueTracker, resultCh <-chan tea.Msg, debug bool) error {
+			model := ui.NewModelWithTracker(ctx, cfg, store, tr)
+			model = model.WithDebug(debug)
 			prog := tea.NewProgram(model,
 				tea.WithAltScreen(),
 				tea.WithOutput(os.Stderr),
@@ -143,6 +149,7 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 
 	unsafeCreds, _ := cmd.Flags().GetBool("unsafe-creds")
 	logLevelStr, _ := cmd.Flags().GetString("log-level")
+	debug, _ := cmd.Flags().GetBool("debug")
 
 	// Resolve config directory and paths.
 	configDir, err := resolveRootConfigDir()
@@ -235,7 +242,7 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 
 	// Step 9: Run BubbleTea program (blocks until user presses q).
 	// emitCh is drained inside runProgram via prog.Send.
-	if err := deps.runProgram(ctx, &cfg, store, emitCh); err != nil {
+	if err := deps.runProgram(ctx, &cfg, store, tr, emitCh, debug); err != nil {
 		slog.Error("bubbletea program exited with error", "err", err)
 	}
 

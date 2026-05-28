@@ -156,8 +156,10 @@ func renderTicket(p renderTicketParams) string {
 		Border(border).
 		BorderForeground(borderColor).
 		Padding(0, 1).
-		MarginBottom(1).
 		Width(p.width)
+	// No MarginBottom — a trailing empty row inside zone.Mark would extend the
+	// drag hit zone past the visible card, breaking the "what I see is what I
+	// can click" expectation on a freeform 2D board.
 
 	return cardStyle.Render(content)
 }

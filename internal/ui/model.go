@@ -19,6 +19,10 @@ type dragState struct {
 	key            string // ticket key being dragged
 	pressX, pressY int    // cursor position at mouse-press
 	motion         bool   // true once cursor moves from press position
+	// Live drag position. Updated on every motion event; canvas reads these
+	// when rendering the card being dragged so movement looks smooth instead of
+	// snapping from press to release.
+	currentX, currentY int
 }
 
 // Model is the root BubbleTea model for cmux-board.
@@ -86,6 +90,28 @@ type Model struct {
 	// Window dimensions (set on tea.WindowSizeMsg)
 	width  int
 	height int
+
+	// Mouse-event diagnostic counters. Visible in the status bar so the user can
+	// confirm whether mouse messages are arriving from the terminal at all
+	// (relevant inside multiplexers like cmux/tmux). Reset on app restart.
+	// Only rendered when debug is true (set via WithDebug from --debug flag).
+	mousePressCount   int
+	mouseMotionCount  int
+	mouseReleaseCount int
+	// Last-drag diagnostic — shows whether press hit a zone, whether motion was
+	// detected, and the final committed (x, y) so we can see drag-handler health
+	// at a glance.
+	dragDebug string
+	// debug gates the visibility of the counters above and dragDebug. False
+	// by default; opt in via the --debug flag on dock.
+	debug bool
+}
+
+// WithDebug returns a copy of m with the debug flag set to enabled. When true
+// the status bar exposes mouse-event counters and the last-drag diagnostic.
+func (m Model) WithDebug(enabled bool) Model {
+	m.debug = enabled
+	return m
 }
 
 // NewModel constructs a Model from cfg and store. Takes an initial snapshot so the

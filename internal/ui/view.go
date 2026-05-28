@@ -29,6 +29,10 @@ func (m Model) View() string {
 		result = m.renderPicker()
 	case ModeApproachName:
 		result = renderWithOverlay(m.width, m.height, m.renderApproachNamePrompt(colors), colors)
+	case ModeImportInput:
+		result = renderWithOverlay(m.width, m.height, m.renderImportInputPrompt(colors), colors)
+	case ModeCreateInput:
+		result = renderWithOverlay(m.width, m.height, m.renderCreateInputPrompt(colors), colors)
 	case ModeAssignmentEditor:
 		result = m.renderAssignmentEditor()
 	case ModeRepoPicker:
@@ -121,9 +125,15 @@ func (m Model) renderModelStatusBar(colors uiColors) string {
 	modeStr := m.modeString()
 
 	// In filter mode, show the filter input value in the notification slot.
+	// In debug mode, show mouse-event counters and last drag-handler debug line.
+	// Otherwise leave the slot empty.
 	var notif string
-	if m.mode == ModeFilter {
+	switch {
+	case m.mode == ModeFilter:
 		notif = fmt.Sprintf("Filter: %s", m.filterInput.View())
+	case m.debug:
+		notif = fmt.Sprintf("mouse: %dP/%dM/%dR | %s",
+			m.mousePressCount, m.mouseMotionCount, m.mouseReleaseCount, m.dragDebug)
 	}
 
 	return renderStatusBar(renderStatusBarParams{
@@ -142,6 +152,38 @@ func (m Model) renderApproachNamePrompt(colors uiColors) string {
 	content := titleStyle.Render("New approach name") + "\n" +
 		dimStyle.Render("(Enter to confirm, Esc to cancel)") + "\n\n" +
 		m.approachNameInput.View()
+
+	return lipgloss.NewStyle().
+		Border(columnBorder).
+		BorderForeground(colors.primary).
+		Padding(1, 3).
+		Render(content)
+}
+
+// renderImportInputPrompt renders the Jira-key import input as centered overlay content.
+func (m Model) renderImportInputPrompt(colors uiColors) string {
+	titleStyle := lipgloss.NewStyle().Foreground(colors.primary).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(colors.muted)
+
+	content := titleStyle.Render("Import Jira ticket") + "\n" +
+		dimStyle.Render("(Enter to import, Esc to cancel)") + "\n\n" +
+		m.importInput.View()
+
+	return lipgloss.NewStyle().
+		Border(columnBorder).
+		BorderForeground(colors.primary).
+		Padding(1, 3).
+		Render(content)
+}
+
+// renderCreateInputPrompt renders the local-ticket creation input as centered overlay content.
+func (m Model) renderCreateInputPrompt(colors uiColors) string {
+	titleStyle := lipgloss.NewStyle().Foreground(colors.primary).Bold(true)
+	dimStyle := lipgloss.NewStyle().Foreground(colors.muted)
+
+	content := titleStyle.Render("New local ticket") + "\n" +
+		dimStyle.Render("(Enter to create, Esc to cancel)") + "\n\n" +
+		m.createInput.View()
 
 	return lipgloss.NewStyle().
 		Border(columnBorder).

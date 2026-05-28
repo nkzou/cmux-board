@@ -56,8 +56,8 @@ func TestCreate_CommitCreatesLocalTicket(t *testing.T) {
 	if ts.LocalStatus != "Open" {
 		t.Errorf("LocalStatus = %q, want %q", ts.LocalStatus, "Open")
 	}
-	if ts.X != 0 || ts.Y != 0 {
-		t.Errorf("position = (%d, %d), want (0, 0)", ts.X, ts.Y)
+	if ts.X < 0 || ts.Y < 0 {
+		t.Errorf("position = (%d, %d), want non-negative cascade default", ts.X, ts.Y)
 	}
 }
 

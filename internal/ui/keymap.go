@@ -57,6 +57,13 @@ const (
 // handleNormalMode handles key events when mode == ModeNormal.
 func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 	snap := m.snapshot
+	// Reconcile zOrder + selection against the current snapshot before dispatching.
+	// View() reconciles on a value-copy that never reaches Update, so on the first
+	// keypress selectedKey is "" and remove/cycle/arrows short-circuit. Reconciling
+	// here ensures every keybind sees an up-to-date selection.
+	if snap != nil {
+		m.reconcileZOrder(snap)
+	}
 	if snap == nil || len(snap.Tickets) == 0 {
 		// No tickets — only mode-switching and quit are meaningful.
 		switch msg.String() {
@@ -113,10 +120,16 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Focus()
 	case KeyManage:
-		// TODO(T-402c): use m.selectedKey.
-		return m, nil
+		if m.selectedKey == "" {
+			return m, nil
+		}
+		return m.openManageActivations(m.selectedKey)
 	case KeyAssignRepos:
-		// TODO(T-402c): use m.selectedKey.
+		if m.selectedKey == "" {
+			return m, nil
+		}
+		m.assignmentEditor = newAssignmentEditorState(m.cfg, m.snapshot, m.selectedKey)
+		m.mode = ModeAssignmentEditor
 		return m, nil
 	case KeyImportJira:
 		m.mode = ModeImportInput

@@ -4,6 +4,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // spinnerTickInterval is the cadence at which the activating-ticket spinner
@@ -23,8 +25,10 @@ func (m Model) spinnerGlyph() string {
 }
 
 // tryActivate dispatches activation for the given ticket key.
-// It resolves the repo via resolveRepoAndRoute and then delegates to tryActivateWithRepo.
-// This is the entry point for both keyboard (Enter on selectedKey) and mouse (click-release).
+// It resolves the repo via resolveRepoAndRoute, then routes based on existing
+// activations: 0 → spawn new; 1 → focus it; 2+ → open the activation picker.
+// Without this routing, pressing Enter on a ticket that already has worktrees
+// would spawn yet another one each time.
 func (m Model) tryActivate(ticketKey string) (Model, tea.Cmd) {
 	if ticketKey == "" {
 		return m, nil
@@ -34,7 +38,17 @@ func (m Model) tryActivate(ticketKey string) (Model, tea.Cmd) {
 	if res.Cancelled || res.PickerOpened {
 		return m, nil
 	}
-	return m.tryActivateWithRepo(ticketKey, res.RepoID, "")
+	activations := state.FindActivations(m.snapshot, ticketKey, res.RepoID)
+	switch len(activations) {
+	case 0:
+		return m.tryActivateWithRepo(ticketKey, res.RepoID, "")
+	case 1:
+		return m.focusActivation(activations[0])
+	default:
+		m.pickerState = newPickerState(m.snapshot, ticketKey, res.RepoID)
+		m.mode = ModePicker
+		return m, nil
+	}
 }
 
 // tryActivateWithRepo guards ActivateCmd against double-activation of the same ticket.
@@ -56,6 +70,28 @@ func (m Model) tryActivateWithRepo(ticketID, repoID, approach string) (Model, te
 		return m, tea.Batch(cmd, spinnerTickCmd())
 	}
 	return m, cmd
+}
+
+// openManageActivations opens the activation picker for ticketKey regardless of
+// how many activations exist. When the ticket has 0 or 1 assigned repos the
+// picker is opened directly; with 2+ assigned the repo picker opens first with
+// manageIntent=true so the user picks a repo before seeing its activations.
+func (m Model) openManageActivations(ticketKey string) (Model, tea.Cmd) {
+	assigned := state.AssignedRepoIDs(m.snapshot, ticketKey)
+	switch len(assigned) {
+	case 0:
+		return m.pushToast("no repo assigned — press a to assign")
+	case 1:
+		m.pickerState = forcePickerState(m.snapshot, ticketKey, assigned[0])
+		m.mode = ModePicker
+		return m, nil
+	default:
+		rp := newRepoPickerState(m.cfg, ticketKey, assigned, false)
+		rp.manageIntent = true
+		m.repoPicker = rp
+		m.mode = ModeRepoPicker
+		return m, nil
+	}
 }
 
 // spinnerTickCmd returns a tick that schedules the next spinner frame.

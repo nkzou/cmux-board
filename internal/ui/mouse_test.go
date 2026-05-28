@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/state"
@@ -231,6 +232,6 @@ func TestMouse_ReleasePromotesZOrderTop(t *testing.T) {
 func scanZone(v string) {
 	// zone.DefaultManager is initialized by TestMain; Scan is safe.
 	if v != "" {
-		_ = v // zone.Scan(v) — commented out to avoid import cycle check
+		zone.Scan(v)
 	}
 }
