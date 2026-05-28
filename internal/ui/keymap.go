@@ -18,6 +18,7 @@ const (
 	// Normal mode actions
 	KeyActivate    = "enter"
 	KeyNewApproach = "N" // capital N — new approach regardless of existing activations
+	KeyManage      = "m" // open activation picker for current ticket regardless of count
 	KeyAssignRepos = "a" // open assignment editor
 	KeyFilter      = "/"
 	KeyHelp        = "?"
@@ -102,6 +103,26 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.mode = ModeApproachName
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Focus()
+	case KeyManage:
+		colTickets := m.ticketsForActiveCol()
+		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+			return m, nil
+		}
+		ticketID := colTickets[m.activeTicketIdx].Key
+		assignedIDs := state.AssignedRepoIDs(m.snapshot, ticketID)
+		switch len(assignedIDs) {
+		case 0:
+			return m.pushToast("no repos assigned — press a to assign")
+		case 1:
+			m.pickerState = forcePickerState(m.snapshot, ticketID, assignedIDs[0])
+			m.mode = ModePicker
+		default:
+			// Multi-repo: let user pick which repo's activations to manage.
+			m.repoPicker = newRepoPickerState(m.cfg, ticketID, assignedIDs, false)
+			m.repoPicker.manageIntent = true
+			m.mode = ModeRepoPicker
+		}
+		return m, nil
 	case KeyAssignRepos:
 		colTickets := m.ticketsForActiveCol()
 		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
@@ -304,6 +325,7 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		ticketID := rp.ticketID
 		firstTouch := rp.firstTouch
+		manageIntent := rp.manageIntent
 		chosenID := row.repoID
 		m.repoPicker = nil
 		m.mode = ModeNormal
@@ -320,7 +342,14 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.snapshotRev = rev
 		}
 
-		// Now check activations for (ticketID, chosenID).
+		if manageIntent {
+			// Open activation picker for the chosen repo without activating.
+			m.pickerState = forcePickerState(m.snapshot, ticketID, chosenID)
+			m.mode = ModePicker
+			return m, nil
+		}
+
+		// Normal activation flow: check activations for (ticketID, chosenID).
 		ps := newPickerState(m.snapshot, ticketID, chosenID)
 		if ps == nil {
 			activations := state.FindActivations(m.snapshot, ticketID, chosenID)

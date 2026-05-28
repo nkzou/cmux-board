@@ -25,6 +25,18 @@ func newPickerState(snap *state.State, ticketID, repoID string) *pickerState {
 	}
 }
 
+// forcePickerState is like newPickerState but always returns a pickerState, even
+// when there are 0 or 1 activations. Used by KeyManage to open the activation
+// manager regardless of how many worktrees exist.
+func forcePickerState(snap *state.State, ticketID, repoID string) *pickerState {
+	return &pickerState{
+		ticketID:  ticketID,
+		repoID:    repoID,
+		entries:   state.FindActivations(snap, ticketID, repoID),
+		cursorIdx: 0,
+	}
+}
+
 // renderPicker renders the activation picker overlay.
 func (m Model) renderPicker() string {
 	if m.pickerState == nil {
