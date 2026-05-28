@@ -15,7 +15,6 @@ Subcommands used:
 - `cmux --json identify` -- verify cmux is available and reachable
 - `cmux new-workspace --name <ws_name>` -- create the two-pane workspace
 - `cmux focus-pane --workspace <ws_ref> --pane <pane_ref>` -- focus a specific pane
-- `cmux docs dock` -- open the dock sidebar
 
 ## claude integration
 

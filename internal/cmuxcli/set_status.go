@@ -9,7 +9,7 @@ import (
 // SetStatusOpts are optional overrides for SetStatus.
 type SetStatusOpts struct {
 	// WorkspaceRef overrides the default workspace target.
-	// When empty, cmux uses $CMUX_WORKSPACE_ID (the dock's own workspace).
+	// When empty, cmux uses $CMUX_WORKSPACE_ID (cmux-board's own workspace).
 	WorkspaceRef string
 	// Priority is the sort priority for the pill (higher = first). Default 0.
 	Priority int

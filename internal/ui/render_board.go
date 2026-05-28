@@ -29,7 +29,7 @@ type renderBoardParams struct {
 
 // boardWidthFraction is the share of the available terminal width that the
 // kanban columns collectively occupy. The remaining ~25% is left as
-// breathing room so the board doesn't bleed to the right edge of the dock.
+// breathing room so the board doesn't bleed to the right edge of the pane.
 const boardWidthFraction = 0.75
 
 // renderBoard renders the kanban board given the provided parameters.
@@ -38,7 +38,7 @@ const boardWidthFraction = 0.75
 // All configured columns are sized to fit within boardWidthFraction*p.width.
 // Columns share that budget evenly and shrink as needed — the previous
 // behaviour clipped columns past width/22 behind ◀ ▶ indicators, which hid
-// most of the board on the narrow Dock sidebar.
+// most of the board on a narrow pane.
 func renderBoard(p renderBoardParams) string {
 	if len(p.columns) == 0 {
 		return lipgloss.NewStyle().

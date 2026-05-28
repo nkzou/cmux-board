@@ -98,10 +98,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		t.Errorf("credentials.json mode: want 0600, got %04o", credsFi.Mode().Perm())
 	}
 
-	// Dock snippet and template help in output
-	if !strings.Contains(w.String(), "dock.json") {
-		t.Errorf("expected dock.json hint in output, got: %q", w.String())
-	}
+	// Template help in output
 	if !strings.Contains(w.String(), "{{.Ticket.Key}}") {
 		t.Errorf("expected template help in output, got: %q", w.String())
 	}

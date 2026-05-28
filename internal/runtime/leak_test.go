@@ -1,6 +1,6 @@
 //go:build e2e
 
-// Package runtime_test: e2e resource-leak check for the dock process.
+// Package runtime_test: e2e resource-leak check for the cmux-board process.
 //
 // Run via:
 //
@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// TestResourceLeak runs a simulated dock process for 10 minutes against a mock
+// TestResourceLeak runs a simulated cmux-board process for 10 minutes against a mock
 // tracker and fake CLIs. It samples Go heap+stack RSS every 30 seconds and
 // asserts:
 //
@@ -44,7 +44,7 @@ func TestResourceLeak(t *testing.T) {
 	defer cancel()
 
 	// Capture RSS samples over the run duration.
-	// In this scaffold the "dock" is not actually started — in a full e2e harness
+	// In this scaffold the board is not actually started — in a full e2e harness
 	// you would spin up a tea.NewProgram here against a mock tracker + fake CLIs.
 	// The structure below is the measurement loop; replace the TODO comment with
 	// the actual program start when the full e2e harness is wired in.

@@ -1,10 +1,10 @@
 # UI Design
 
-cmux-board renders as a right-sidebar dock inside a cmux session. The dock width is
-managed by cmux; the BubbleTea model receives the terminal dimensions from cmux and
-renders within them. There are no fullscreen modes -- the board occupies one pane.
+cmux-board renders inside a dedicated cmux workspace pane. The pane width is managed
+by cmux; the BubbleTea model receives the terminal dimensions from cmux and renders
+within them. There are no fullscreen modes -- the board occupies one pane.
 
-## Dock layout
+## Board layout
 
 The board shows ticket columns side by side. Each column has a header (status name)
 and a scrollable list of ticket cards. The active card is highlighted. Column width

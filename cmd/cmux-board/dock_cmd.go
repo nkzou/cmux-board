@@ -23,8 +23,8 @@ import (
 
 var dockCmd = &cobra.Command{
 	Use:   "dock",
-	Short: "Start the cmux-board kanban Dock",
-	Long:  "Launch the cmux-board kanban board in a cmux Dock sidebar.",
+	Short: "Start the cmux-board kanban board",
+	Long:  "Launch the cmux-board kanban board in the current terminal.",
 	RunE:  runDock,
 }
 

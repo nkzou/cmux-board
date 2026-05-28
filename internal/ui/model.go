@@ -12,14 +12,14 @@ import (
 	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
-// Model is the root BubbleTea model for the cmux-board dock UI.
+// Model is the root BubbleTea model for cmux-board.
 // It implements tea.Model: Init, Update, and View.
 //
 // All external I/O (polling, activation, focus) is performed in tea.Cmd goroutines
 // that communicate results back as tea.Msg values. Update itself is non-blocking.
 type Model struct {
 	// Startup context — captured at NewModel time; all I/O Cmds close over this.
-	// Cancelled when the dock shuts down.
+	// Cancelled when cmux-board shuts down.
 	ctx context.Context
 
 	// Core data (read from store snapshots)
@@ -92,7 +92,7 @@ func NewModel(cfg *config.Config, store *state.Store) Model {
 }
 
 // NewModelWithContext is like NewModel but accepts an explicit context for production use.
-// The dock cobra command should pass a context that it cancels on shutdown.
+// The `dock` cobra subcommand should pass a context that it cancels on shutdown.
 func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.Store) Model {
 	input := textinput.New()
 	input.Placeholder = "approach name"
