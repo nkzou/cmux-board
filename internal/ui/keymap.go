@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"math"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/nkzou/cmux-board/internal/state"
@@ -24,6 +26,14 @@ const (
 	KeyHelp        = "?"
 	KeyQuit        = "q"
 
+	// Post-it board keybinds (T-501).
+	KeyImportJira   = "i"
+	KeyCreateLocal  = "c"
+	KeyRemoveTicket = "x"
+	KeyCycleStatus  = "s"
+	KeyZCycleNext   = "tab"
+	KeyZCyclePrev   = "shift+tab"
+
 	// Picker mode
 	KeyPickerFocus   = "enter"
 	KeyPickerNew     = "n" // lowercase n — new approach from picker
@@ -45,8 +55,6 @@ const (
 )
 
 // handleNormalMode handles key events when mode == ModeNormal.
-// T-402c will rewrite this fully with selectedKey + zOrder navigation.
-// Guards added in T-402a so compilation is clean while column fields are removed.
 func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 	snap := m.snapshot
 	if snap == nil || len(snap.Tickets) == 0 {
@@ -60,19 +68,39 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		case KeyFilter:
 			m.mode = ModeFilter
 			m.filterInput.Focus()
+		case KeyImportJira:
+			m.mode = ModeImportInput
+			m.importInput.SetValue("")
+			m.importInput.Focus()
+		case KeyCreateLocal:
+			m.mode = ModeCreateInput
+			m.createInput.SetValue("")
+			m.createInput.Focus()
 		}
 		return m, nil
 	}
 
 	switch msg.String() {
 	case KeyLeft, "left":
-		// TODO(T-402c): spatial nearest-neighbor navigation.
+		if next := nearestWest(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
+		}
 	case KeyRight, "right":
-		// TODO(T-402c): spatial nearest-neighbor navigation.
+		if next := nearestEast(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
+		}
 	case KeyDown, "down":
-		// TODO(T-402c): spatial nearest-neighbor navigation.
+		if next := nearestSouth(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
+		}
 	case KeyUp, "up":
-		// TODO(T-402c): spatial nearest-neighbor navigation.
+		if next := nearestNorth(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
+		}
+	case KeyZCycleNext:
+		m.selectedKey = zCycleNext(m.zOrder, m.selectedKey)
+	case KeyZCyclePrev:
+		m.selectedKey = zCyclePrev(m.zOrder, m.selectedKey)
 	case KeyActivate:
 		if m.selectedKey == "" {
 			return m, nil
@@ -90,6 +118,42 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case KeyAssignRepos:
 		// TODO(T-402c): use m.selectedKey.
 		return m, nil
+	case KeyImportJira:
+		m.mode = ModeImportInput
+		m.importInput.SetValue("")
+		m.importInput.Focus()
+	case KeyCreateLocal:
+		m.mode = ModeCreateInput
+		m.createInput.SetValue("")
+		m.createInput.Focus()
+	case KeyRemoveTicket:
+		if m.selectedKey == "" {
+			return m, nil
+		}
+		key := m.selectedKey
+		if err := m.store.Mutate(func(s *state.State) error {
+			state.RemoveTicket(s, key)
+			return nil
+		}); err != nil {
+			return m.pushToast("remove failed: " + err.Error())
+		}
+		snap2, rev := m.store.Snapshot()
+		m.snapshot = snap2
+		m.snapshotRev = rev
+	case KeyCycleStatus:
+		if m.selectedKey == "" {
+			return m, nil
+		}
+		key := m.selectedKey
+		if err := m.store.Mutate(func(s *state.State) error {
+			state.CycleStatus(s, key)
+			return nil
+		}); err != nil {
+			return m.pushToast("cycle status failed: " + err.Error())
+		}
+		snap2, rev := m.store.Snapshot()
+		m.snapshot = snap2
+		m.snapshotRev = rev
 	case KeyFilter:
 		m.mode = ModeFilter
 		m.filterInput.Focus()
@@ -100,6 +164,130 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+// nearestEast returns the key of the nearest ticket strictly to the east of fromKey.
+// East means t.X > from.X; ties broken by smallest dx then smallest |dy|.
+// Returns "" if no ticket qualifies.
+func nearestEast(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDx, bestDy := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.X <= from.X {
+			continue
+		}
+		dx := t.X - from.X
+		dy := abs(t.Y - from.Y)
+		if dx < bestDx || (dx == bestDx && dy < bestDy) {
+			best, bestDx, bestDy = k, dx, dy
+		}
+	}
+	return best
+}
+
+// nearestWest returns the key of the nearest ticket strictly to the west of fromKey.
+func nearestWest(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDx, bestDy := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.X >= from.X {
+			continue
+		}
+		dx := from.X - t.X
+		dy := abs(t.Y - from.Y)
+		if dx < bestDx || (dx == bestDx && dy < bestDy) {
+			best, bestDx, bestDy = k, dx, dy
+		}
+	}
+	return best
+}
+
+// nearestSouth returns the key of the nearest ticket strictly to the south (higher Y).
+func nearestSouth(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDy, bestDx := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.Y <= from.Y {
+			continue
+		}
+		dy := t.Y - from.Y
+		dx := abs(t.X - from.X)
+		if dy < bestDy || (dy == bestDy && dx < bestDx) {
+			best, bestDy, bestDx = k, dy, dx
+		}
+	}
+	return best
+}
+
+// nearestNorth returns the key of the nearest ticket strictly to the north (lower Y).
+func nearestNorth(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDy, bestDx := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.Y >= from.Y {
+			continue
+		}
+		dy := from.Y - t.Y
+		dx := abs(t.X - from.X)
+		if dy < bestDy || (dy == bestDy && dx < bestDx) {
+			best, bestDy, bestDx = k, dy, dx
+		}
+	}
+	return best
+}
+
+// zCycleNext advances selectedKey to the next entry in zOrder (wraps around).
+// Returns selectedKey unchanged if it is not in zOrder or zOrder is empty.
+func zCycleNext(zOrder []string, selectedKey string) string {
+	if len(zOrder) == 0 {
+		return selectedKey
+	}
+	for i, k := range zOrder {
+		if k == selectedKey {
+			return zOrder[(i+1)%len(zOrder)]
+		}
+	}
+	// Not found: select first.
+	return zOrder[0]
+}
+
+// zCyclePrev retreats selectedKey to the previous entry in zOrder (wraps around).
+// Returns selectedKey unchanged if it is not in zOrder or zOrder is empty.
+func zCyclePrev(zOrder []string, selectedKey string) string {
+	if len(zOrder) == 0 {
+		return selectedKey
+	}
+	for i, k := range zOrder {
+		if k == selectedKey {
+			return zOrder[(i-1+len(zOrder))%len(zOrder)]
+		}
+	}
+	// Not found: select last.
+	return zOrder[len(zOrder)-1]
+}
+
+// abs returns the absolute value of x.
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // handlePickerMode handles key events when mode == ModePicker.

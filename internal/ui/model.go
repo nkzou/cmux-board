@@ -55,6 +55,8 @@ type Model struct {
 	approachNameInput textinput.Model
 	filterInput       textinput.Model
 	filterQuery       string
+	importInput       textinput.Model // Jira-key import overlay (T-502)
+	createInput       textinput.Model // local-ticket creation overlay (T-503)
 
 	// Overlay sub-states (nil when not active)
 	pickerState      *pickerState
@@ -106,6 +108,14 @@ func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.S
 	fi.CharLimit = 100
 	fi.Width = 30
 
+	ii := textinput.New()
+	ii.Placeholder = "JIRA-123"
+	ii.CharLimit = 64
+
+	ci := textinput.New()
+	ci.Placeholder = "ticket name"
+	ci.CharLimit = 128
+
 	snap, rev := store.Snapshot()
 
 	return Model{
@@ -120,6 +130,8 @@ func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.S
 		mode:              ModeNormal,
 		approachNameInput: input,
 		filterInput:       fi,
+		importInput:       ii,
+		createInput:       ci,
 	}
 }
 
