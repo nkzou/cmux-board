@@ -53,4 +53,7 @@ type repoPickerState struct {
 	// firstTouch is true when this picker is opened for a 0-assigned ticket;
 	// on selection the chosen id is appended to assigned_repo_ids.
 	firstTouch bool
+	// manageIntent is true when the picker was opened via KeyManage; on selection
+	// the activation picker opens instead of triggering activation.
+	manageIntent bool
 }

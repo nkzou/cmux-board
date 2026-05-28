@@ -23,16 +23,13 @@ func renderStatusBar(p renderStatusBarParams) string {
 	}
 
 	modeConfigs := map[string]modeConfig{
-		"NORMAL":        {"◆", p.colors.primary},
-		"INSERT":        {"✎", p.colors.success},
-		"COMMAND":       {":", p.colors.secondary},
-		"CREATE_TICKET": {"+", p.colors.success},
-		"EDIT_TICKET":   {"✎", p.colors.warning},
-		"AGENT_VIEW":    {"▶", p.colors.info},
-		"SETTINGS":      {"⚙", p.colors.secondary},
-		"HELP":          {"?", p.colors.primary},
-		"CONFIRM":       {"!", p.colors.err},
-		"FILTER":        {"/", p.colors.info},
+		"NORMAL":  {"◆", p.colors.primary},
+		"INSERT":  {"✎", p.colors.success},
+		"PICKER":  {"◈", p.colors.info},
+		"ASSIGN":  {"☑", p.colors.warning},
+		"HELP":    {"?", p.colors.primary},
+		"CONFIRM": {"!", p.colors.err},
+		"FILTER":  {"/", p.colors.info},
 	}
 
 	cfg, ok := modeConfigs[p.mode]
@@ -83,31 +80,36 @@ func renderStatusBar(p renderStatusBarParams) string {
 // contextualHints returns keyboard hint text for the given mode.
 func contextualHints(mode string, hintStyle, dimStyle lipgloss.Style, sep string) string {
 	switch mode {
+	case "NORMAL":
+		return hintStyle.Render("h/l") + dimStyle.Render(" col") + sep +
+			hintStyle.Render("j/k") + dimStyle.Render(" ticket") + sep +
+			hintStyle.Render("Enter") + dimStyle.Render(" activate") + sep +
+			hintStyle.Render("m") + dimStyle.Render(" manage") + sep +
+			hintStyle.Render("N") + dimStyle.Render(" new approach") + sep +
+			hintStyle.Render("a") + dimStyle.Render(" assign") + sep +
+			hintStyle.Render("/") + dimStyle.Render(" filter") + sep +
+			hintStyle.Render("?") + dimStyle.Render(" help") + sep +
+			hintStyle.Render("q") + dimStyle.Render(" quit")
+	case "PICKER":
+		return hintStyle.Render("j/k") + dimStyle.Render(" navigate") + sep +
+			hintStyle.Render("Enter") + dimStyle.Render(" focus") + sep +
+			hintStyle.Render("n") + dimStyle.Render(" new") + sep +
+			hintStyle.Render("d") + dimStyle.Render(" delete") + sep +
+			hintStyle.Render("Esc") + dimStyle.Render(" cancel")
+	case "ASSIGN":
+		return hintStyle.Render("j/k") + dimStyle.Render(" navigate") + sep +
+			hintStyle.Render("Space") + dimStyle.Render(" toggle") + sep +
+			hintStyle.Render("Enter") + dimStyle.Render(" confirm") + sep +
+			hintStyle.Render("Esc") + dimStyle.Render(" cancel")
+	case "INSERT":
+		return hintStyle.Render("Enter") + dimStyle.Render(" confirm") + sep +
+			hintStyle.Render("Esc") + dimStyle.Render(" cancel")
 	case "FILTER":
 		return hintStyle.Render("Enter") + dimStyle.Render(" apply") + sep +
-			hintStyle.Render("Esc") + dimStyle.Render(" cancel")
-	case "SETTINGS":
-		return hintStyle.Render("j/k") + dimStyle.Render(" navigate") + sep +
-			hintStyle.Render("Enter") + dimStyle.Render(" select") + sep +
-			hintStyle.Render("Esc") + dimStyle.Render(" close")
-	case "CREATE_TICKET", "EDIT_TICKET":
-		action := "create"
-		if mode == "EDIT_TICKET" {
-			action = "save"
-		}
-		return hintStyle.Render("Tab") + dimStyle.Render(" next") + sep +
-			hintStyle.Render("Ctrl+S") + dimStyle.Render(" "+action) + sep +
-			hintStyle.Render("Esc") + dimStyle.Render(" cancel")
-	case "AGENT_VIEW":
-		return hintStyle.Render("Ctrl+G") + dimStyle.Render(" back to board")
-	case "NORMAL":
-		return hintStyle.Render("h/l") + dimStyle.Render(" columns") + sep +
-			hintStyle.Render("n") + dimStyle.Render(" new") + sep +
-			hintStyle.Render("Space") + dimStyle.Render(" move") + sep +
-			hintStyle.Render("/") + dimStyle.Render(" search") + sep +
-			hintStyle.Render("?") + dimStyle.Render(" help")
+			hintStyle.Render("Esc") + dimStyle.Render(" clear")
+	case "HELP":
+		return dimStyle.Render("any key") + dimStyle.Render(" close")
 	default:
-		return hintStyle.Render("Esc") + dimStyle.Render(" back") + sep +
-			hintStyle.Render("?") + dimStyle.Render(" help")
+		return hintStyle.Render("Esc") + dimStyle.Render(" back")
 	}
 }

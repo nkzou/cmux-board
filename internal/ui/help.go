@@ -28,17 +28,32 @@ func renderHelp(colors uiColors) string {
 
 	help := titleStyle.Render("◈ Keyboard Shortcuts") + "\n\n" +
 		sep + "\n" +
-		sectionStyle.Render("  🧭 Navigation") + "                 " + sectionStyle.Render("📝 Actions") + "\n" +
+		sectionStyle.Render("  Normal") + "\n" +
 		sep + "\n" +
-		"  " + keyStyle.Render("h/l") + descStyle.Render("   Move between columns  ") + keyStyle.Render("n") + descStyle.Render("       New ticket") + "\n" +
-		"  " + keyStyle.Render("j/k") + descStyle.Render("   Move between tickets  ") + keyStyle.Render("e") + descStyle.Render("       Edit ticket") + "\n" +
-		"  " + keyStyle.Render("g") + descStyle.Render("     Go to first ticket    ") + keyStyle.Render("d") + descStyle.Render("       Delete ticket") + "\n" +
-		"  " + keyStyle.Render("G") + descStyle.Render("     Go to last ticket     ") + keyStyle.Render("Space") + descStyle.Render("   Move forward") + "\n\n" +
+		"  " + keyStyle.Render("h/l") + descStyle.Render("     Move between columns") + "\n" +
+		"  " + keyStyle.Render("j/k") + descStyle.Render("     Move between tickets") + "\n" +
+		"  " + keyStyle.Render("Enter") + descStyle.Render("   Activate ticket (open worktree or focus)") + "\n" +
+		"  " + keyStyle.Render("m") + descStyle.Render("       Manage activations for ticket") + "\n" +
+		"  " + keyStyle.Render("N") + descStyle.Render("       New approach (skips existing activation check)") + "\n" +
+		"  " + keyStyle.Render("a") + descStyle.Render("       Assign repos to ticket") + "\n" +
+		"  " + keyStyle.Render("/") + descStyle.Render("       Filter tickets") + "\n" +
+		"  " + keyStyle.Render("?") + descStyle.Render("       Toggle this help") + "\n" +
+		"  " + keyStyle.Render("q") + descStyle.Render("       Quit") + "\n\n" +
 		sep + "\n" +
-		sectionStyle.Render("  👁 View") + "\n" +
+		sectionStyle.Render("  Picker  ") + descStyle.Render("(activation list)") + "\n" +
 		sep + "\n" +
-		"  " + keyStyle.Render("/") + descStyle.Render("     Search/filter         ") + keyStyle.Render("O") + descStyle.Render("       Settings") + "\n" +
-		"  " + keyStyle.Render("?") + descStyle.Render("     Toggle help           ") + keyStyle.Render("q") + descStyle.Render("       Quit") + "\n\n" +
+		"  " + keyStyle.Render("j/k") + descStyle.Render("     Navigate activations") + "\n" +
+		"  " + keyStyle.Render("Enter") + descStyle.Render("   Focus selected activation") + "\n" +
+		"  " + keyStyle.Render("n") + descStyle.Render("       New approach") + "\n" +
+		"  " + keyStyle.Render("d") + descStyle.Render("       Delete activation") + "\n" +
+		"  " + keyStyle.Render("Esc") + descStyle.Render("     Cancel") + "\n\n" +
+		sep + "\n" +
+		sectionStyle.Render("  Assign  ") + descStyle.Render("(repo assignment editor)") + "\n" +
+		sep + "\n" +
+		"  " + keyStyle.Render("j/k") + descStyle.Render("     Navigate repos") + "\n" +
+		"  " + keyStyle.Render("Space") + descStyle.Render("   Toggle assignment") + "\n" +
+		"  " + keyStyle.Render("Enter") + descStyle.Render("   Confirm") + "\n" +
+		"  " + keyStyle.Render("Esc") + descStyle.Render("     Cancel") + "\n\n" +
 		sep + "\n" +
 		"  " + dimStyle.Render("Press any key to close")
 
