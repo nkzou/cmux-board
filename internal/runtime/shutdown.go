@@ -36,7 +36,7 @@ type storeFlushable interface {
 	Flush() error
 }
 
-// Coordinator manages graceful shutdown of the dock process.
+// Coordinator manages graceful shutdown of the cmux-board process.
 type Coordinator struct {
 	cancel       context.CancelFunc
 	poller       pollerWaiter

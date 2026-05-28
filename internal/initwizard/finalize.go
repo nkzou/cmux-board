@@ -33,7 +33,7 @@ type WizardInput struct {
 }
 
 // Finalize prints a summary, prompts for confirmation, writes all three files,
-// verifies mode bits, and prints the Dock snippet + template help.
+// verifies mode bits, and prints the template help.
 // configDir is the directory for all three files (default ~/.config/cmux-board/).
 func Finalize(ctx context.Context, w io.Writer, r io.Reader, input WizardInput, configDir string) error {
 	// Print summary.
@@ -115,8 +115,7 @@ func Finalize(ctx context.Context, w io.Writer, r io.Reader, input WizardInput, 
 		slog.Warn("failed to chmod config dir", "dir", configDir, "err", err)
 	}
 
-	// Print Dock snippet and template help.
-	PrintDockSnippet(w, configDir)
+	// Print template help.
 	PrintTemplateHelp(w)
 
 	return nil

@@ -185,7 +185,7 @@ func defaultWizardFunc(cmd *cobra.Command, configDir string) error {
 		return fmt.Errorf("repos: %w", err)
 	}
 
-	// 7. Finalize: confirmation prompt, write three files atomically, print Dock snippet.
+	// 7. Finalize: confirmation prompt, write three files atomically, print template help.
 	input := initwizard.WizardInput{
 		Adapter:         "jira",
 		Site:            site,

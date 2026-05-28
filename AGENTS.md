@@ -3,7 +3,7 @@
 **Module:** `github.com/nkzou/cmux-board`
 
 TUI kanban board that syncs with Jira Cloud and spawns Claude Code agents per ticket.
-Go 1.25+, BubbleTea, Lipgloss. Runs inside a cmux Dock sidebar.
+Go 1.25+, BubbleTea, Lipgloss. Runs inside a cmux workspace.
 
 ## Structure
 
@@ -21,7 +21,7 @@ internal/
   cmuxcli/           # cmux CLI wrapper (NewWorkspace, FocusPane, ListWorkspaces)
   git/               # Worktree creation, branch sanitize, path uniquify
   runtime/           # Startup reconciliation, preflight checks, logger, shutdown
-  initwizard/        # Interactive init wizard (prompts, finalize, dock snippet)
+  initwizard/        # Interactive init wizard (prompts, finalize)
   secretsink/        # slog Writer-stage token redaction
 docs/                # Design docs, smoke test, coverage table
 ```

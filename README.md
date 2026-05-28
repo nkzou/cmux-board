@@ -1,6 +1,6 @@
 # cmux-board
 
-A TUI kanban board that runs inside a [cmux](https://cmux.dev) Dock sidebar. Syncs with Jira Cloud and spawns Claude Code agents per ticket, each in its own git worktree and cmux workspace.
+A TUI kanban board that runs inside a [cmux](https://cmux.dev) workspace. Syncs with Jira Cloud and spawns Claude Code agents per ticket, each in its own git worktree and cmux workspace.
 
 ---
 
@@ -36,7 +36,7 @@ make build
 # First-time setup
 cmux-board init
 
-# Start the board inside a cmux Dock pane
+# Start the board in a cmux workspace
 cmux-board dock
 ```
 
@@ -45,7 +45,6 @@ cmux-board dock
 - Picks a board.
 - Registers one or more git repos.
 - Writes `~/.config/cmux-board/config.json` and `credentials.json` (mode 0600).
-- Prints the Dock snippet to add to `~/.config/cmux/dock.json`.
 
 ---
 

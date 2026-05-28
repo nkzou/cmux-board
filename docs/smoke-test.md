@@ -36,7 +36,7 @@ Before starting, confirm all of the following:
 
 - [ ] **1.5** Confirm to write files.
   Expected: wizard prints `config.json written`, `credentials.json written`, `state.json written`
-  and shows the Dock JSON snippet for `~/.config/cmux/dock.json`.
+  and the starter prompt template help.
 
 - [ ] **1.6** Verify mode bits:
   ```
@@ -56,7 +56,7 @@ Before starting, confirm all of the following:
 
 ---
 
-## Phase 2 — dock startup and board render
+## Phase 2 — startup and board render
 
 - [ ] **2.1** Run `./cmux-board dock`.
   Expected: no pre-flight errors; board renders within 2 seconds; ticket cards appear.
@@ -118,7 +118,7 @@ Before starting, confirm all of the following:
 
 ## Phase 4 — focus flow (1 activation, focus existing)
 
-- [ ] **4.1** Switch back to the `cmux-board dock` pane (or window). Navigate to the same
+- [ ] **4.1** Switch back to the `cmux-board` pane (or window). Navigate to the same
   ticket. Press `Enter`.
   Expected: `cmux focus-pane` is called; the existing workspace comes to the front. No new
   workspace is created. (F14)
@@ -138,7 +138,7 @@ Before starting, confirm all of the following:
   claude rm <SHORT_ID_FROM_STATE>
   ```
 
-- [ ] **5.2** In the dock, press `Enter` on the same ticket.
+- [ ] **5.2** In cmux-board, press `Enter` on the same ticket.
   Expected: picker opens with an `[orphan]` glyph next to the activation. (E7)
 
 - [ ] **5.3** Press `r` in the picker.
@@ -204,7 +204,7 @@ Before starting, confirm all of the following:
   `last_known_status` in `state.json` reflects the new status.
 
 - [ ] **8.2** Simulate an OCC conflict: in a browser, change the same ticket's status in Jira
-  to a different column. Immediately move the card in the dock via `l`.
+  to a different column. Immediately move the card in cmux-board via `l`.
   Expected: a non-modal toast appears ("conflict -- snapped back"); card returns to the
   column matching Jira's current status. No duplicate transitions. (F12, E3)
 
@@ -212,7 +212,7 @@ Before starting, confirm all of the following:
 
 ## Phase 9 — clean shutdown
 
-- [ ] **9.1** Press `q` to quit the dock.
+- [ ] **9.1** Press `q` to quit cmux-board.
   Expected: exit code 0; `state.json` modification time is current (written on shutdown).
   ```
   echo $?   # should be 0

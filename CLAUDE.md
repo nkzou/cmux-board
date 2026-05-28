@@ -1,6 +1,6 @@
 # cmux-board
 
-Terminal-based kanban board with Jira sync and Claude Code agent spawning. Runs inside a cmux Dock sidebar.
+Terminal-based kanban board with Jira sync and Claude Code agent spawning. Runs inside a cmux workspace.
 
 ## Stack
 
