@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/muesli/termenv"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/state"
@@ -16,26 +16,15 @@ func init() {
 	lipgloss.SetColorProfile(termenv.Ascii)
 }
 
-// defaultTestBoard is the standard board layout used by view tests.
-// Schema v3: board layout is NOT stored on State; set directly on Model.
-var defaultTestBoard = state.BoardSnapshot{
-	BoardID:   "test-board",
-	BoardName: "Test Board",
-	Columns: []state.ColumnSnapshot{
-		{ID: "todo", Name: "Todo", StatusIDs: []string{"todo"}},
-	},
-}
-
-// makeViewTestModel creates a Model seeded with board columns and tickets.
-// Board layout is set directly on the model (schema v3: not stored on State).
-func makeViewTestModel(t *testing.T, snap *state.State, board state.BoardSnapshot, repos map[string]config.RepoEntry) Model {
+// makeViewTestModel creates a Model seeded with tickets.
+// Board layout is removed in T-402a; these tests cover basic view composition.
+func makeViewTestModel(t *testing.T, snap *state.State, repos map[string]config.RepoEntry) Model {
 	t.Helper()
 	store, err := state.Open(t.TempDir() + "/state.json")
 	if err != nil {
 		t.Fatalf("state.Open: %v", err)
 	}
 	if snap != nil {
-		// Only write tickets and activations — board is not stored on State.
 		if err := store.Mutate(func(s *state.State) error {
 			for k, v := range snap.Tickets {
 				s.Tickets[k] = v
@@ -54,14 +43,9 @@ func makeViewTestModel(t *testing.T, snap *state.State, board state.BoardSnapsho
 		Repos:         repos,
 	}
 	m := NewModel(cfg, store)
-	// Set board layout directly on the model.
-	m.board = board
 	s, rev := store.Snapshot()
 	m.snapshot = s
 	m.snapshotRev = rev
-	mapped, unmapped := resolveTicketsWithBoard(board, s)
-	m.tickets = flattenMapped(m.board, mapped)
-	m.unmappedTickets = unmapped
 	m.width = 120
 	m.height = 40
 	return m
@@ -77,58 +61,18 @@ func buildTestSnap(tickets []state.TicketState) *state.State {
 	return s
 }
 
-// should render empty board with no-tickets hint when board has no tickets.
+// should render empty view without panicking.
 func TestView_EmptyBoard(t *testing.T) {
 	t.Parallel()
 	snap := buildTestSnap(nil)
-	m := makeViewTestModel(t, snap, defaultTestBoard, nil)
+	m := makeViewTestModel(t, snap, nil)
 	rendered := m.View()
 	if rendered == "" {
 		t.Error("View() returned empty string for empty board")
 	}
-	// Should contain the board name.
-	if !containsStr(rendered, "Test Board") {
-		t.Errorf("expected board name in view output:\n%s", rendered)
-	}
-}
-
-// should render three tickets across two columns plus one unmapped column (E1).
-func TestView_ThreeTicketsTwoColumnsUnmapped(t *testing.T) {
-	t.Parallel()
-	testBoard := state.BoardSnapshot{
-		BoardID:   "test-board",
-		BoardName: "Test Board",
-		Columns: []state.ColumnSnapshot{
-			{ID: "col-todo", Name: "Todo", StatusIDs: []string{"todo"}},
-			{ID: "col-done", Name: "Done", StatusIDs: []string{"done"}},
-		},
-	}
-	snap := buildTestSnap([]state.TicketState{
-		{Key: "PROJ-1", Summary: "First", Status: "todo"},
-		{Key: "PROJ-2", Summary: "Second", Status: "todo"},
-		{Key: "PROJ-3", Summary: "Unmapped", Status: "unknown_status"},
-	})
-
-	m := makeViewTestModel(t, snap, testBoard, nil)
-	rendered := m.View()
-	// Unmapped column should appear.
-	if !containsStr(rendered, "Unmapped") {
-		t.Errorf("expected Unmapped column in view:\n%s", rendered)
-	}
-	// PROJ-3 should appear with its summary.
-	if !containsStr(rendered, "Unmapped") {
-		t.Errorf("expected unmapped ticket summary in view:\n%s", rendered)
-	}
-
-	// Remove unmapped ticket: build a new model without PROJ-3.
-	snap2 := buildTestSnap([]state.TicketState{
-		{Key: "PROJ-1", Summary: "First", Status: "todo"},
-		{Key: "PROJ-2", Summary: "Second", Status: "todo"},
-	})
-	m2 := makeViewTestModel(t, snap2, testBoard, nil)
-	rendered2 := m2.View()
-	if containsStr(rendered2, "? Unmapped") {
-		t.Errorf("Unmapped column should be gone when no unmapped tickets:\n%s", rendered2)
+	// Should contain the board id from cfg.
+	if !containsStr(rendered, "test-board") {
+		t.Errorf("expected board id in view output:\n%s", rendered)
 	}
 }
 
@@ -136,7 +80,7 @@ func TestView_ThreeTicketsTwoColumnsUnmapped(t *testing.T) {
 func TestView_PickerOverlay(t *testing.T) {
 	t.Parallel()
 	snap := buildTestSnap(nil)
-	m := makeViewTestModel(t, snap, defaultTestBoard, map[string]config.RepoEntry{
+	m := makeViewTestModel(t, snap, map[string]config.RepoEntry{
 		"repo-a": {ID: "repo-a", Name: "Repo A"},
 	})
 	// Seed two activations so picker is non-nil.
@@ -169,7 +113,7 @@ func TestView_AssignmentEditorOverlay(t *testing.T) {
 	snap := buildTestSnap([]state.TicketState{
 		{Key: "PROJ-1", Summary: "Test", Status: "todo"},
 	})
-	m := makeViewTestModel(t, snap, defaultTestBoard, map[string]config.RepoEntry{
+	m := makeViewTestModel(t, snap, map[string]config.RepoEntry{
 		"repo-a": {ID: "repo-a", Name: "Repo A", Path: "/a"},
 	})
 	s, _ := m.store.Snapshot()
@@ -187,7 +131,7 @@ func TestView_AssignmentEditorOverlay(t *testing.T) {
 func TestView_ApproachNameOverlay(t *testing.T) {
 	t.Parallel()
 	snap := buildTestSnap(nil)
-	m := makeViewTestModel(t, snap, defaultTestBoard, nil)
+	m := makeViewTestModel(t, snap, nil)
 	m.mode = ModeApproachName
 	m.approachNameInput.Focus()
 
@@ -201,7 +145,7 @@ func TestView_ApproachNameOverlay(t *testing.T) {
 func TestView_ToastAppended(t *testing.T) {
 	t.Parallel()
 	snap := buildTestSnap(nil)
-	m := makeViewTestModel(t, snap, defaultTestBoard, nil)
+	m := makeViewTestModel(t, snap, nil)
 	m, _ = m.pushToast("hello from toast")
 
 	rendered := m.View()

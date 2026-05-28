@@ -45,92 +45,50 @@ const (
 )
 
 // handleNormalMode handles key events when mode == ModeNormal.
+// T-402c will rewrite this fully with selectedKey + zOrder navigation.
+// Guards added in T-402a so compilation is clean while column fields are removed.
 func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
+	snap := m.snapshot
+	if snap == nil || len(snap.Tickets) == 0 {
+		// No tickets — only mode-switching and quit are meaningful.
+		switch msg.String() {
+		case KeyHelp:
+			m.mode = ModeHelp
+		case KeyQuit:
+			m.mode = ModeShuttingDown
+			return m, tea.Quit
+		case KeyFilter:
+			m.mode = ModeFilter
+			m.filterInput.Focus()
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
 	case KeyLeft, "left":
-		if m.activeColIdx > 0 {
-			m.activeColIdx--
-			m.activeTicketIdx = 0
-		}
+		// TODO(T-402c): spatial nearest-neighbor navigation.
 	case KeyRight, "right":
-		colCount := len(m.board.Columns)
-		if m.activeColIdx < colCount-1 {
-			m.activeColIdx++
-			m.activeTicketIdx = 0
-		}
+		// TODO(T-402c): spatial nearest-neighbor navigation.
 	case KeyDown, "down":
-		colTickets := m.ticketsForActiveCol()
-		if m.activeTicketIdx < len(colTickets)-1 {
-			m.activeTicketIdx++
-		}
+		// TODO(T-402c): spatial nearest-neighbor navigation.
 	case KeyUp, "up":
-		if m.activeTicketIdx > 0 {
-			m.activeTicketIdx--
-		}
+		// TODO(T-402c): spatial nearest-neighbor navigation.
 	case KeyActivate:
-		// Determine current ticket.
-		colTickets := m.ticketsForActiveCol()
-		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
-			return m, nil
-		}
-		ticketID := colTickets[m.activeTicketIdx].Key
-		var res RepoResolution
-		m, res = resolveRepoAndRoute(m, ticketID)
-		if res.Cancelled || res.PickerOpened {
-			// Cancelled → toast was pushed; PickerOpened → ModeRepoPicker is now active.
-			return m, nil
-		}
-		// Exactly 1 repo assigned: check for existing activations.
-		repoID := res.RepoID
-		ps := newPickerState(m.snapshot, ticketID, repoID)
-		if ps == nil {
-			activations := state.FindActivations(m.snapshot, ticketID, repoID)
-			if len(activations) == 0 {
-				// 0 activations → activate with empty approach name.
-				return m.tryActivate(ticketID, repoID, "")
-			}
-			// 1 activation → focus directly (T-063).
-			return m.focusActivation(activations[0])
-		}
-		// 2+ activations → open activation picker.
-		m.pickerState = ps
-		m.mode = ModePicker
+		// TODO(T-402c): use m.selectedKey.
+		// Guard: activation requires a selected ticket; no-op until T-402c.
 		return m, nil
 	case KeyNewApproach:
 		// Capital N: new approach regardless of existing activations (F16).
-		// MUST NOT check len(activations) before entering ModeApproachName.
 		m.previousMode = ModeNormal
 		m.mode = ModeApproachName
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Focus()
 	case KeyManage:
-		colTickets := m.ticketsForActiveCol()
-		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
-			return m, nil
-		}
-		ticketID := colTickets[m.activeTicketIdx].Key
-		assignedIDs := state.AssignedRepoIDs(m.snapshot, ticketID)
-		switch len(assignedIDs) {
-		case 0:
-			return m.pushToast("no repos assigned — press a to assign")
-		case 1:
-			m.pickerState = forcePickerState(m.snapshot, ticketID, assignedIDs[0])
-			m.mode = ModePicker
-		default:
-			// Multi-repo: let user pick which repo's activations to manage.
-			m.repoPicker = newRepoPickerState(m.cfg, ticketID, assignedIDs, false)
-			m.repoPicker.manageIntent = true
-			m.mode = ModeRepoPicker
-		}
+		// TODO(T-402c): use m.selectedKey.
 		return m, nil
 	case KeyAssignRepos:
-		colTickets := m.ticketsForActiveCol()
-		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
-			return m, nil
-		}
-		ticketID := colTickets[m.activeTicketIdx].Key
-		m.assignmentEditor = newAssignmentEditorState(m.cfg, m.snapshot, ticketID)
-		m.mode = ModeAssignmentEditor
+		// TODO(T-402c): use m.selectedKey.
+		return m, nil
 	case KeyFilter:
 		m.mode = ModeFilter
 		m.filterInput.Focus()
@@ -221,24 +179,16 @@ func (m Model) handleApproachNameMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Blur()
 		m.mode = ModeNormal
-		// Determine (ticketID, repoID) from context we came from.
+		// Determine (ticketID, repoID) from context.
 		var ticketID, repoID string
 		if m.previousMode == ModePicker && m.pickerState != nil {
 			ticketID = m.pickerState.ticketID
 			repoID = m.pickerState.repoID
 			m.pickerState = nil
 		} else {
-			colTickets := m.ticketsForActiveCol()
-			if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
-				return m, nil
-			}
-			ticketID = colTickets[m.activeTicketIdx].Key
-			var res RepoResolution
-			m, res = resolveRepoAndRoute(m, ticketID)
-			if res.Cancelled || res.PickerOpened {
-				return m, nil
-			}
-			repoID = res.RepoID
+			// TODO(T-402c): use m.selectedKey for ticketID once navigation is wired.
+			// Guard until T-402c: no-op if no selectedKey.
+			return m, nil
 		}
 		m.previousMode = ModeNormal
 		return m.tryActivate(ticketID, repoID, name)
@@ -384,22 +334,4 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 func (m Model) handleHelpMode(_ tea.KeyMsg) (Model, tea.Cmd) {
 	m.mode = ModeNormal
 	return m, nil
-}
-
-// ticketsForActiveCol returns the tickets in the currently active column.
-// Returns nil if the board has no columns or activeColIdx is out of range.
-func (m Model) ticketsForActiveCol() []state.TicketState {
-	if len(m.board.Columns) == 0 || m.activeColIdx >= len(m.board.Columns) {
-		return nil
-	}
-	return m.ticketsInCol(m.board.Columns[m.activeColIdx].ID)
-}
-
-// ticketsInCol returns tickets mapped to colID from the snapshot.
-func (m Model) ticketsInCol(colID string) []state.TicketState {
-	if m.snapshot == nil {
-		return nil
-	}
-	mapped, _ := resolveTicketsWithBoard(m.board, m.snapshot)
-	return mapped[colID]
 }

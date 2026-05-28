@@ -20,8 +20,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePushOK(msg)
 	case PushConflictMsg:
 		return m.handlePushConflict(msg)
-	case pushResultMsg:
-		return m.handlePushResult(msg)
 	case snapshotRefreshMsg:
 		return m.refreshSnapshot()
 	case activationDoneMsg:
@@ -69,19 +67,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 }
 
-// refreshSnapshot re-derives the board from the store.
+// refreshSnapshot re-derives the snapshot from the store.
 // Called after PollOKMsg, snapshotRefreshMsg, and store mutations that need a UI refresh.
 func (m Model) refreshSnapshot() (Model, tea.Cmd) {
 	snap, rev := m.store.Snapshot()
 	m.snapshot = snap
 	m.snapshotRev = rev
-	// Board layout not stored on State in schema v3; m.board retains last-set value.
-	// M-4 will provide board layout via the spatial layer.
-
-	mapped, unmapped := resolveTicketsWithBoard(m.board, snap)
-	m.tickets = flattenMapped(m.board, mapped)
-	m.unmappedTickets = unmapped
-
+	// T-403 renderPostitCanvas reads directly from the snapshot; no pre-computed
+	// tickets slice needed here.
 	return m, nil
 }
 

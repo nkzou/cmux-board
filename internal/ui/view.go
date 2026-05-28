@@ -17,7 +17,7 @@ func (m Model) View() string {
 
 	base := lipgloss.JoinVertical(lipgloss.Left,
 		m.renderHeader(colors),
-		m.renderModelBoard(colors),
+		m.renderPostitCanvas(),
 		m.renderModelStatusBar(colors),
 	)
 
@@ -51,11 +51,9 @@ func (m Model) View() string {
 
 // renderHeader renders the top bar with board id/name on the left and status pills on the right.
 func (m Model) renderHeader(colors uiColors) string {
-	boardLabel := m.board.BoardID
-	if m.board.BoardName != "" {
-		boardLabel = m.board.BoardName
-	}
-	if boardLabel == "" && m.cfg != nil {
+	// T-402b will remove m.board; for now use cfg for label.
+	var boardLabel string
+	if m.cfg != nil {
 		boardLabel = m.cfg.BoardID
 	}
 
@@ -113,98 +111,6 @@ func (m Model) renderStatusPills(colors uiColors) string {
 
 	sep := lipgloss.NewStyle().Foreground(colors.overlay).Render("│")
 	return lipgloss.JoinHorizontal(lipgloss.Center, tracker, sep, cmuxPill, sep, claude)
-}
-
-// renderModelBoard renders the kanban board using the current model state.
-// Adapts state.BoardSnapshot + state.TicketState to the renderBoard params format.
-func (m Model) renderModelBoard(colors uiColors) string {
-	if len(m.board.Columns) == 0 {
-		return lipgloss.NewStyle().
-			Foreground(colors.muted).
-			Padding(2, 4).
-			Render("No columns configured.")
-	}
-
-	// Build filtered ticket map (colID → []Ticket).
-	ticketMap := m.buildFilteredTicketMap()
-
-	// Build column + ticket-lists for renderBoard.
-	cols := make([]Column, len(m.board.Columns))
-	colTickets := make([][]Ticket, len(m.board.Columns))
-	for i, col := range m.board.Columns {
-		cols[i] = Column{ID: col.ID, Name: col.Name}
-		colTickets[i] = ticketMap[col.ID]
-	}
-
-	// Append unmapped column when there are unmapped tickets.
-	unmapped := m.buildUnmappedTickets()
-	if len(unmapped) > 0 {
-		cols = append(cols, Column{ID: "__unmapped__", Name: "? Unmapped"})
-		colTickets = append(colTickets, unmapped)
-	}
-
-	p := renderBoardParams{
-		columns:       cols,
-		width:         m.width,
-		colors:        colors,
-		scrollOffset:  0,
-		activeColumn:  m.activeColIdx,
-		columnTickets: colTickets,
-		columnOffsets: make([]int, len(cols)),
-		activeTicket:  m.activeTicketIdx,
-		spinnerGlyph:  m.spinnerGlyph(),
-	}
-	return renderBoard(p)
-}
-
-// buildFilteredTicketMap applies filterQuery and returns colID → []Ticket.
-func (m Model) buildFilteredTicketMap() map[string][]Ticket {
-	if m.snapshot == nil {
-		return nil
-	}
-	result := make(map[string][]Ticket)
-	query := m.filterQuery
-
-	mapped, _ := resolveTicketsWithBoard(m.board, m.snapshot)
-	for colID, tickets := range mapped {
-		for _, t := range tickets {
-			if query != "" {
-				lower := strings.ToLower(query)
-				if !strings.Contains(strings.ToLower(t.Key), lower) &&
-					!strings.Contains(strings.ToLower(t.Summary), lower) {
-					continue
-				}
-			}
-			result[colID] = append(result[colID], ticketStateToUI(t, m.activatingTickets[t.Key], state.ActivationCount(m.snapshot, t.Key)))
-		}
-	}
-	return result
-}
-
-// buildUnmappedTickets converts m.unmappedTickets to the placeholder Ticket type.
-func (m Model) buildUnmappedTickets() []Ticket {
-	out := make([]Ticket, 0, len(m.unmappedTickets))
-	for _, t := range m.unmappedTickets {
-		out = append(out, ticketStateToUI(t, m.activatingTickets[t.Key], state.ActivationCount(m.snapshot, t.Key)))
-	}
-	return out
-}
-
-// ticketStateToUI converts a state.TicketState to the placeholder Ticket type.
-// isActivating reflects whether an Activate goroutine is currently running for
-// this ticket; activationCount is the number of existing worktrees. Both drive
-// header badges in renderTicket.
-func ticketStateToUI(t state.TicketState, isActivating bool, activationCount int) Ticket {
-	return Ticket{
-		Key:             t.Key,
-		Summary:         t.Summary,
-		Status:          t.Status,
-		Labels:          t.Labels,
-		Priority:        t.Priority,
-		URL:             t.URL,
-		IsActivating:    isActivating,
-		ActivationCount: activationCount,
-	}
 }
 
 // renderModelStatusBar renders the status bar using current mode and filter state.
@@ -277,6 +183,23 @@ func (m Model) modeString() string {
 		return "CONFIRM"
 	default:
 		return "NORMAL"
+	}
+}
+
+// ticketStateToUI converts a state.TicketState to the placeholder Ticket type.
+// isActivating reflects whether an Activate goroutine is currently running for
+// this ticket; activationCount is the number of existing worktrees. Both drive
+// header badges in renderTicket.
+func ticketStateToUI(t state.TicketState, isActivating bool, activationCount int) Ticket {
+	return Ticket{
+		Key:             t.Key,
+		Summary:         t.Summary,
+		Status:          t.Status,
+		Labels:          t.Labels,
+		Priority:        t.Priority,
+		URL:             t.URL,
+		IsActivating:    isActivating,
+		ActivationCount: activationCount,
 	}
 }
 
