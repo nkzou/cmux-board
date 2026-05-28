@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/nkzou/cmux-board/internal/state"
-	isync "github.com/nkzou/cmux-board/internal/sync"
-	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // TestConcurrentMutateAdd50 spawns 50 goroutines that each add a distinct ticket.
@@ -56,12 +54,12 @@ func TestConcurrentMutateAdd50(t *testing.T) {
 	}
 }
 
-// TestPollVsActivateParallelism simulates the most common real-world race condition:
-// a background poller calling MergePulledTickets concurrently with an activation
+// TestRefreshVsActivateParallelism simulates the most common real-world race condition:
+// a background refresher writing updated ticket data concurrently with an activation
 // orchestrator appending an ActivationEntry. 1000 iterations, each with a per-iteration
 // start-gate, plus random micro-sleeps to maximise interleaving.
-// Ties to: F17, F-NEW5, Codex Finding 4, CONVENTIONS.md poll-merge contract.
-func TestPollVsActivateParallelism(t *testing.T) {
+// Ties to: F17, CONVENTIONS.md poll-merge contract.
+func TestRefreshVsActivateParallelism(t *testing.T) {
 	t.Parallel()
 	store, err := state.Open(t.TempDir() + "/state.json")
 	if err != nil {
@@ -75,7 +73,7 @@ func TestPollVsActivateParallelism(t *testing.T) {
 			Key:             "PROJ-1",
 			Summary:         "seed ticket",
 			Status:          "To Do",
-			LastKnownStatus: "To Do",
+			Source:          "jira",
 			AssignedRepoIDs: seedRepos,
 		}
 		return nil
@@ -93,21 +91,24 @@ func TestPollVsActivateParallelism(t *testing.T) {
 		// actID is long enough to take an 8-char prefix safely.
 		actID := fmt.Sprintf("act-%08d", iter)
 
-		// Goroutine A: poller-style — merge two tickets using MergePulledTickets.
+		// Goroutine A: refresher-style — update status/summary on existing ticket only.
+		// This simulates the new read-only refresher writing data fields via Mutate.
 		go func() {
 			defer wg.Done()
 			<-ready
 			// Local rng per goroutine — no shared state.
-			sleep := rand.New(rand.NewSource(int64(iter*2))).Int63n(5000) //nolint:gosec
+			sleep := rand.New(rand.NewSource(int64(iter * 2))).Int63n(5000) //nolint:gosec
 			time.Sleep(time.Duration(sleep))
 			if err := store.Mutate(func(s *state.State) error {
-				isync.MergePulledTickets(s, []tracker.Ticket{
-					{Key: "PROJ-1", Summary: "seed ticket", Status: "To Do"},
-					{Key: "PROJ-2", Summary: "new ticket", Status: "In Progress"},
-				})
+				for key, ts := range s.Tickets {
+					if ts.Source == "jira" {
+						ts.Status = "In Progress"
+						s.Tickets[key] = ts
+					}
+				}
 				return nil
 			}); err != nil {
-				t.Errorf("iter %d poller Mutate: %v", iter, err)
+				t.Errorf("iter %d refresher Mutate: %v", iter, err)
 			}
 		}()
 
@@ -115,7 +116,7 @@ func TestPollVsActivateParallelism(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-ready
-			sleep := rand.New(rand.NewSource(int64(iter*2+1))).Int63n(5000) //nolint:gosec
+			sleep := rand.New(rand.NewSource(int64(iter*2 + 1))).Int63n(5000) //nolint:gosec
 			time.Sleep(time.Duration(sleep))
 			if err := store.Mutate(func(s *state.State) error {
 				if s.Activations == nil {
@@ -140,12 +141,9 @@ func TestPollVsActivateParallelism(t *testing.T) {
 
 	snap, _ := store.Snapshot()
 
-	// Both PROJ-1 and PROJ-2 must be present (no ticket lost by a poll overwrite).
+	// PROJ-1 must be present (not lost by concurrent writes).
 	if _, ok := snap.Tickets["PROJ-1"]; !ok {
 		t.Error("PROJ-1 missing from state after parallel runs")
-	}
-	if _, ok := snap.Tickets["PROJ-2"]; !ok {
-		t.Error("PROJ-2 missing from state after parallel runs")
 	}
 
 	// No activation must be lost.
@@ -153,7 +151,7 @@ func TestPollVsActivateParallelism(t *testing.T) {
 		t.Errorf("activations[PROJ-1] = %d, want %d", len(snap.Activations["PROJ-1"]), iterations)
 	}
 
-	// AssignedRepoIDs on PROJ-1 must be preserved across all polls.
+	// AssignedRepoIDs on PROJ-1 must be preserved across all refresher writes.
 	if len(snap.Tickets["PROJ-1"].AssignedRepoIDs) == 0 ||
 		snap.Tickets["PROJ-1"].AssignedRepoIDs[0] != seedRepos[0] {
 		t.Errorf("AssignedRepoIDs = %v, want %v", snap.Tickets["PROJ-1"].AssignedRepoIDs, seedRepos)

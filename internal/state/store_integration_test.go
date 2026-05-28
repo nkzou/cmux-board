@@ -44,17 +44,18 @@ func TestStoreOpenAndMutateRoundTrip(t *testing.T) {
 	}
 }
 
-// TestStoreOpenExistingFile verifies that Open loads an existing state file correctly.
+// TestStoreOpenExistingFile verifies that Open loads an existing v3 state file correctly.
+// Per D2, legacy (v2) state files are silently discarded and replaced by an empty board.
 func TestStoreOpenExistingFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 
-	// Write a valid state.json manually
+	// Write a valid v3 state.json manually (SchemaVersionCurrent = 3).
 	existing := State{
-		SchemaVersion: 2,
+		SchemaVersion: SchemaVersionCurrent,
 		Tickets: map[string]TicketState{
-			"EXISTING-1": {Key: "EXISTING-1", Summary: "pre-existing"},
+			"EXISTING-1": {Key: "EXISTING-1", Summary: "pre-existing", Source: "jira"},
 		},
 		Activations: make(map[string][]ActivationEntry),
 	}

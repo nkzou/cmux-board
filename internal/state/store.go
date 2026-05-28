@@ -2,9 +2,13 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/nkzou/cmux-board/internal/atomicfile"
 )
@@ -21,17 +25,49 @@ type Store struct {
 }
 
 // Open loads state from path (or returns empty State if file absent).
+// Three-way decision on the file contents:
+//
+//  1. File absent: return DefaultState (clean start).
+//  2. Valid JSON but wrong schema_version: log at DEBUG, return DefaultState (E5 legacy-schema case).
+//  3. Invalid JSON (corruption): rename original to .corrupt-<timestamp>, log at WARN,
+//     return DefaultState (Review F-05 data-safety requirement).
 func Open(path string) (*Store, error) {
 	s := &Store{path: path}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			initial := DefaultState()
 			s.state = &initial
 			return s, nil
 		}
 		return nil, fmt.Errorf("failed to open state: %w", err)
 	}
+
+	// Probe the schema_version before full unmarshal.
+	var probe struct {
+		SchemaVersion int `json:"schema_version"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		// Corruption case (NOT a legacy schema). Preserve the original file.
+		bak := path + ".corrupt-" + time.Now().UTC().Format("20060102T150405Z")
+		_ = os.Rename(path, bak) // best-effort; ignore rename errors
+		slog.Warn("state file unreadable; preserved original", "backup_path", bak)
+		initial := DefaultState()
+		s.state = &initial
+		return s, nil
+	}
+
+	if probe.SchemaVersion != SchemaVersionCurrent {
+		// Legacy schema (E5). Silent fallback — no backup needed for expected schema transitions.
+		slog.Debug("state schema mismatch; starting with empty board",
+			"got", probe.SchemaVersion, "want", SchemaVersionCurrent)
+		initial := DefaultState()
+		s.state = &initial
+		return s, nil
+	}
+
+	// Full unmarshal into State.
 	var st State
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("failed to parse state: %w", err)
