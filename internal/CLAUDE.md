@@ -12,7 +12,7 @@ tea "github.com/charmbracelet/bubbletea"
 "github.com/charmbracelet/lipgloss"
 
 // 3. Internal
-"github.com/techdufus/openkanban/internal/board"
+"github.com/nkzou/cmux-board/internal/state"
 ```
 
 ## Error Handling

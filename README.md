@@ -1,90 +1,108 @@
-<h1 align="center">
-  <br>
-  <img src="https://github.com/user-attachments/assets/14cde506-2091-4745-9349-2604d8ec5b32" alt="OpenKanban" width="600">
-  <br>
-</h1>
+# cmux-board
 
-<h4 align="center">A TUI kanban board for orchestrating AI coding agents.</h4>
-
-<p align="center">
-  <a href="https://github.com/TechDufus/openkanban/releases/latest">
-    <img src="https://img.shields.io/github/v/release/TechDufus/openkanban?style=flat-square&color=blue" alt="Release">
-  </a>
-  <a href="https://github.com/TechDufus/openkanban/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/TechDufus/openkanban?style=flat-square&color=green" alt="License">
-  </a>
-  <a href="https://github.com/TechDufus/openkanban">
-    <img src="https://img.shields.io/github/go-mod/go-version/TechDufus/openkanban?style=flat-square" alt="Go Version">
-  </a>
-  <a href="https://github.com/TechDufus/openkanban/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/TechDufus/openkanban/release.yaml?style=flat-square&label=build" alt="Build Status">
-  </a>
-</p>
-
-<p align="center">
-  <img src="./docs/assets/demo.gif" alt="OpenKanban Demo" width="800">
-</p>
+A TUI kanban board that runs inside a [cmux](https://cmux.dev) Dock sidebar. Syncs with Jira Cloud and spawns Claude Code agents per ticket, each in its own git worktree and cmux workspace.
 
 ---
 
-## Why?
+## What it does
 
-AI coding agents are powerful, but managing multiple agents across projects gets messy fast. You end up with terminals everywhere, losing track of what's running where, and context-switching between tasks becomes a chore.
+cmux-board keeps a local mirror of your Jira board. Press `Enter` on a ticket to:
 
-OpenKanban gives you a single view of all your work. Each ticket gets its own git worktree and embedded terminal. Spawn an agent, watch it work, jump between tasks. Everything stays organized.
+1. Create a git worktree for that ticket.
+2. Launch a Claude Code background session (`claude --bg`) in the worktree.
+3. Open a cmux workspace with the agent view on the left and a shell on the right.
+4. Focus the workspace automatically.
 
-## Features
+A background poller keeps the board in sync. Pushing a card to a different column transitions it in Jira immediately. Conflicts snap the card back with a toast.
 
-- **Tickets as worktrees** - Each task gets an isolated git branch
-- **Embedded terminals** - Agents run inside the TUI, not in random terminal tabs
-- **Any agent** - OpenCode, Claude Code, Gemini, Codex, Aider, or whatever CLI tool you prefer
-- **Multi-project** - Manage tickets across all your repositories from one board
+---
 
 ## Install
 
-### Homebrew (macOS/Linux)
+Build from source:
 
 ```bash
-brew install TechDufus/tap/openkanban
+git clone https://github.com/nkzou/cmux-board
+cd cmux-board
+make build
+# binary: ./cmux-board
 ```
 
-To update:
+---
+
+## Quick start
 
 ```bash
-brew upgrade openkanban
+# First-time setup
+cmux-board init
+
+# Start the board inside a cmux Dock pane
+cmux-board dock
 ```
 
-### Go
+`cmux-board init` runs an interactive wizard that:
+- Authenticates to Jira Cloud.
+- Picks a board.
+- Registers one or more git repos.
+- Writes `~/.config/cmux-board/config.json` and `credentials.json` (mode 0600).
+- Prints the Dock snippet to add to `~/.config/cmux/dock.json`.
 
-```bash
-go install github.com/techdufus/openkanban@latest
-```
+---
 
-## Quick Start
-
-```bash
-cd ~/projects/my-app
-openkanban new "My App"
-openkanban
-```
-
-## Keybindings
+## Key bindings
 
 | Key | Action |
 |-----|--------|
-| `j/k` | Navigate tickets up/down |
-| `h/l` | Navigate between columns |
-| `space` | Move ticket to next column |
-| `n` | New ticket |
-| `s` | Spawn agent |
-| `enter` | Attach to agent |
-| `?` | Full help |
+| `j / k` | Move cursor up / down |
+| `h / l` | Move cursor left / right across columns |
+| `Enter` | Activate ticket (create worktree + agent) or focus existing |
+| `N` | New activation with a named approach |
+| `a` | Open repo assignment editor |
+| `q` | Quit |
+| `?` | Help |
+
+---
+
+## Repo management
+
+```bash
+cmux-board repos add /path/to/repo   # Register a repo
+cmux-board repos list                 # List registered repos
+cmux-board repos remove <id>          # Remove (refused if referenced)
+```
+
+---
 
 ## Configuration
 
-OpenKanban is highly configurable. Agents, keybindings, branch naming, cleanup behavior - all customizable in `~/.config/openkanban/config.json`.
+All config lives in `~/.config/cmux-board/`:
 
-See [Configuration Guide](./docs/CONFIGURATION.md) for details.
+| File | Mode | Contents |
+|------|------|----------|
+| `config.json` | 0644 | Board settings, repos, poll interval |
+| `credentials.json` | 0600 | Jira API token + email |
+| `state.json` | 0644 | Ticket mirror + activation journal |
+
+---
+
+## Development
+
+```bash
+make build            # Build binary
+make test             # Unit tests with race detector
+make verify-additive  # Enforce additive-only cmux invariant
+go vet ./...          # Vet
+```
+
+See [docs/smoke-test.md](docs/smoke-test.md) for the manual end-to-end checklist.
+
+---
+
+## Credits
+
+Based on [openkanban](https://github.com/TechDufus/openkanban) by TechDufus. The BubbleTea board view in `internal/ui/` and the git-worktree helpers in `internal/git/` were ported from it.
+
+---
 
 ## License
 

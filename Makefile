@@ -1,45 +1,30 @@
-.PHONY: build test test-unit test-integration test-all coverage lint clean help
-
+BINARY := cmux-board
 GO := go
-BINARY := openkanban
 COVERAGE_FILE := coverage.out
 
+.PHONY: build test lint clean coverage test-integration test-e2e verify-additive
+
 build:
-	$(GO) build -o $(BINARY) .
+	$(GO) build -o $(BINARY) ./cmd/cmux-board
 
-test: test-unit
-
-test-unit:
+test: verify-additive
 	$(GO) test -race ./...
 
 test-integration:
 	$(GO) test -race -tags integration ./...
 
-test-all: test-unit test-integration
-
 coverage:
 	$(GO) test -race -coverprofile=$(COVERAGE_FILE) ./...
-	$(GO) tool cover -html=$(COVERAGE_FILE) -o coverage.html
-
-coverage-integration:
-	$(GO) test -race -tags integration -coverprofile=$(COVERAGE_FILE) ./...
-	$(GO) tool cover -html=$(COVERAGE_FILE) -o coverage.html
 
 lint:
 	$(GO) vet ./...
-	@if command -v staticcheck >/dev/null 2>&1; then staticcheck ./...; fi
+	@if command -v staticcheck >/dev/null 2>&1; then staticcheck -checks=all,-U1000,-ST1000,-ST1005 ./...; fi
 
 clean:
 	rm -f $(BINARY) $(COVERAGE_FILE) coverage.html
 
-help:
-	@echo "Available targets:"
-	@echo "  build             - Build the binary"
-	@echo "  test              - Run unit tests (default)"
-	@echo "  test-unit         - Run unit tests only"
-	@echo "  test-integration  - Run integration tests only"
-	@echo "  test-all          - Run all tests (unit + integration)"
-	@echo "  coverage          - Generate coverage report (unit tests)"
-	@echo "  coverage-integration - Generate coverage report (all tests)"
-	@echo "  lint              - Run linters"
-	@echo "  clean             - Remove build artifacts"
+test-e2e:
+	$(GO) test -tags e2e -race -timeout 15m ./internal/runtime/...
+
+verify-additive:
+	bash scripts/check_additive_only.sh

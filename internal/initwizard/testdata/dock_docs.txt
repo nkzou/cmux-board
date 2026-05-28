@@ -1,0 +1,5 @@
+cmux docs dock: command not found — see dock_snippet.go fallback comment.
+
+The `cmux` binary was not available on PATH during the T-068 spike (2026-05-27).
+The dock.json snippet in dock_snippet.go is a hand-written best-effort template.
+Verify against `cmux docs dock` before shipping. Tracked as PLAN_REVIEW RT-2.

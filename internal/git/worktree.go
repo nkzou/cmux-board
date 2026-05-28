@@ -6,20 +6,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/techdufus/openkanban/internal/project"
 )
 
 type WorktreeManager struct {
 	repoPath string
 	baseDir  string
-}
-
-func NewWorktreeManager(p *project.Project) *WorktreeManager {
-	return &WorktreeManager{
-		repoPath: p.RepoPath,
-		baseDir:  p.GetWorktreeDir(),
-	}
 }
 
 func NewWorktreeManagerFromPaths(repoPath, baseDir string) *WorktreeManager {
@@ -29,37 +20,7 @@ func NewWorktreeManagerFromPaths(repoPath, baseDir string) *WorktreeManager {
 	}
 }
 
-func (m *WorktreeManager) CreateWorktree(branchName, baseBranch string) (string, error) {
-	if err := os.MkdirAll(m.baseDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create worktree base directory: %w", err)
-	}
-
-	worktreePath := filepath.Join(m.baseDir, sanitizeBranchName(branchName))
-
-	if _, err := os.Stat(worktreePath); err == nil {
-		if m.isValidWorktree(worktreePath) {
-			return worktreePath, nil
-		}
-		os.RemoveAll(worktreePath)
-	}
-
-	cmd := exec.Command("git", "worktree", "add", "-b", branchName, worktreePath, baseBranch)
-	cmd.Dir = m.repoPath
-
-	if output, err := cmd.CombinedOutput(); err != nil {
-		if strings.Contains(string(output), "already exists") {
-			cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
-			cmd.Dir = m.repoPath
-			if output2, err2 := cmd.CombinedOutput(); err2 != nil {
-				return "", fmt.Errorf("failed to create worktree: %s: %w", string(output2), err2)
-			}
-			return worktreePath, nil
-		}
-		return "", fmt.Errorf("failed to create worktree: %s: %w", string(output), err)
-	}
-
-	return worktreePath, nil
-}
+// CreateWorktreeAt is defined in createworktreeat.go (T-005a)
 
 func (m *WorktreeManager) isValidWorktree(path string) bool {
 	gitPath := filepath.Join(path, ".git")
@@ -215,11 +176,20 @@ func (m *WorktreeManager) HasUncommittedChanges(worktreePath string) (bool, erro
 }
 
 func sanitizeBranchName(name string) string {
-	name = strings.TrimPrefix(name, "refs/heads/")
-	name = strings.TrimPrefix(name, "agent/")
-	name = strings.TrimPrefix(name, "feature/")
-	name = strings.ReplaceAll(name, "/", "-")
-	return name
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('-')
+		}
+	}
+	s := b.String()
+	// collapse consecutive dashes
+	for strings.Contains(s, "--") {
+		s = strings.ReplaceAll(s, "--", "-")
+	}
+	return strings.Trim(s, "-")
 }
 
 func ResolveMainRepo(path string) string {
