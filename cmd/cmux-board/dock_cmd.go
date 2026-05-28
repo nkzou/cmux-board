@@ -10,9 +10,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 	"github.com/spf13/cobra"
 
 	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/refresh"
 	"github.com/nkzou/cmux-board/internal/runtime"
 	"github.com/nkzou/cmux-board/internal/state"
 	isync "github.com/nkzou/cmux-board/internal/sync"
@@ -102,7 +104,11 @@ func prodDockDeps() dockDeps {
 		},
 		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error {
 			model := ui.NewModelWithContext(ctx, cfg, store)
-			prog := tea.NewProgram(model, tea.WithAltScreen(), tea.WithOutput(os.Stderr))
+			prog := tea.NewProgram(model,
+				tea.WithAltScreen(),
+				tea.WithOutput(os.Stderr),
+				tea.WithMouseCellMotion(),
+			)
 			// Drain bridge.ResultCh and forward each message to the program.
 			if resultCh != nil {
 				go func() {
@@ -204,20 +210,41 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 	// Construct the tracker adapter.
 	tr := deps.newTracker(cfg, creds)
 
-	// Step 8: Create bridge and start sync.Poller + push worker.
-	// bridge.ResultCh is drained inside runProgram via prog.Send.
-	bridge := isync.NewBridge()
-	poller := isync.NewPoller(ctx, &cfg, tr, store, bridge.EmitFn())
-	go bridge.RunPushWorker(ctx, store, tr)
+	// Step 8: Start refresher (read-only ticker; no push worker).
+	// zone.NewGlobal initializes the bubblezone manager for mouse hit-testing.
+	zone.NewGlobal()
+	defer zone.Close()
+
+	refreshCfg := refresh.Config{
+		Interval: time.Duration(cfg.PollIntervalSeconds) * time.Second,
+	}
+
+	// emitCh buffers messages from the refresher and is drained by runProgram via prog.Send.
+	// Capacity 32 matches the old bridge channel capacity.
+	emitCh := make(chan tea.Msg, 32)
+	emitFn := func(msg tea.Msg) {
+		select {
+		case emitCh <- msg:
+		default:
+		}
+	}
+	refresher := refresh.NewRefresher(ctx, refreshCfg, tr, store, emitFn)
+
+	// Legacy poller kept alive during T-601 only so NewCoordinator still compiles.
+	// T-603 removes this pin and passes the refresher to NewCoordinator directly.
+	legacyPoller := isync.NewPoller(ctx, &cfg, nil, store, emitFn)
 
 	// Shutdown coordinator.
-	coord := runtime.NewCoordinator(cancel, poller, store, slog.Default())
+	coord := runtime.NewCoordinator(cancel, legacyPoller, store, slog.Default())
 
 	// Step 9: Run BubbleTea program (blocks until user presses q).
-	// bridge.ResultCh draining is handled inside runProgram via prog.Send.
-	if err := deps.runProgram(ctx, &cfg, store, bridge.ResultCh); err != nil {
+	// emitCh is drained inside runProgram via prog.Send.
+	if err := deps.runProgram(ctx, &cfg, store, emitCh); err != nil {
 		slog.Error("bubbletea program exited with error", "err", err)
 	}
+
+	// Silence refresher until T-603 passes it to NewCoordinator.
+	_ = refresher
 
 	// Step 10: BubbleTea exited → cancel context → drain → flush.
 	// Cancel first so the Coordinator.Run sees ctx.Done() and proceeds with drain.

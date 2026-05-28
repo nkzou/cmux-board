@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
+	zone "github.com/lrstanley/bubblezone"
 
 	"github.com/nkzou/cmux-board/internal/state"
 )
@@ -46,7 +47,9 @@ func (m Model) View() string {
 		result = lipgloss.JoinVertical(lipgloss.Left, result, m.renderToasts(colors))
 	}
 
-	return result
+	// zone.Scan wraps the root view exactly once so bubblezone can map mouse
+	// events to zone markers placed in renderPostitCanvas.
+	return zone.Scan(result)
 }
 
 // renderHeader renders the top bar with board id/name on the left and status pills on the right.
