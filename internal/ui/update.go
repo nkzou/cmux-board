@@ -64,6 +64,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.handleRepoPickerMode(msg)
 	case ModeHelp:
 		return m.handleHelpMode(msg)
+	case ModeImportInput:
+		return m.handleImportInputMode(msg)
+	case ModeCreateInput:
+		return m.handleCreateInputMode(msg)
 	default:
 		return m, nil
 	}

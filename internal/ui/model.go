@@ -96,6 +96,14 @@ func NewModel(cfg *config.Config, store *state.Store) Model {
 	return NewModelWithContext(context.Background(), cfg, store)
 }
 
+// NewModelWithTracker is like NewModelWithContext but also accepts an IssueTracker.
+// Used in tests and in the production dock command after T-502 adds import functionality.
+func NewModelWithTracker(ctx context.Context, cfg *config.Config, store *state.Store, tr tracker.IssueTracker) Model {
+	m := NewModelWithContext(ctx, cfg, store)
+	m.tr = tr
+	return m
+}
+
 // NewModelWithContext is like NewModel but accepts an explicit context for production use.
 // The `dock` cobra subcommand should pass a context that it cancels on shutdown.
 func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.Store) Model {
