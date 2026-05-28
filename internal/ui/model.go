@@ -12,6 +12,15 @@ import (
 	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
+// dragState tracks an in-flight mouse drag.
+// It is in-memory only and never persisted (no JSON tags).
+// Cleared to nil on mouse-release (T-404).
+type dragState struct {
+	key            string // ticket key being dragged
+	pressX, pressY int    // cursor position at mouse-press
+	motion         bool   // true once cursor moves from press position
+}
+
 // Model is the root BubbleTea model for cmux-board.
 // It implements tea.Model: Init, Update, and View.
 //
@@ -20,21 +29,21 @@ import (
 type Model struct {
 	// Startup context — captured at NewModel time; all I/O Cmds close over this.
 	// Cancelled when cmux-board shuts down.
+	// CONVENTIONS exception: context-in-struct is explicitly documented here
+	// because the BubbleTea Model owns goroutine lifetime.
 	ctx context.Context
 
 	// Core data (read from store snapshots)
 	cfg         *config.Config
 	store       *state.Store
-	tr          tracker.IssueTracker // may be nil in tests (drag no-ops when nil)
+	tr          tracker.IssueTracker // may be nil in tests
 	snapshot    *state.State
 	snapshotRev uint64
 
-	// Board render state
-	board           state.BoardSnapshot
-	tickets         []state.TicketState // visible (removed_at == nil), sorted by column
-	unmappedTickets []state.TicketState
-	activeColIdx    int
-	activeTicketIdx int
+	// Freeform board navigation state (M-4)
+	selectedKey string     // key of the currently selected post-it; "" = none
+	zOrder      []string   // render order: last element is topmost (on top)
+	dragging    *dragState // non-nil while a drag is in flight
 
 	// UI mode
 	mode Mode
@@ -51,12 +60,6 @@ type Model struct {
 	pickerState      *pickerState
 	assignmentEditor *assignmentEditorState
 	repoPicker       *repoPickerState
-
-	// Drag state (T-065)
-	dragging         bool
-	dragTicketID     string
-	dragFromColumn   string // column ID at drag-start; used for snap-back on conflict
-	dragTargetColumn string // column ID of current hover target
 
 	// Status pills
 	trackerPill pillState
@@ -111,8 +114,9 @@ func NewModelWithContext(ctx context.Context, cfg *config.Config, store *state.S
 		store:             store,
 		snapshot:          snap,
 		snapshotRev:       rev,
-		// Board layout not stored on State in schema v3; M-4 provides board via spatial layer.
-		board:             state.BoardSnapshot{},
+		selectedKey:       "",
+		zOrder:            nil,
+		dragging:          nil,
 		mode:              ModeNormal,
 		approachNameInput: input,
 		filterInput:       fi,
