@@ -17,7 +17,6 @@ import (
 	"github.com/nkzou/cmux-board/internal/refresh"
 	"github.com/nkzou/cmux-board/internal/runtime"
 	"github.com/nkzou/cmux-board/internal/state"
-	isync "github.com/nkzou/cmux-board/internal/sync"
 	"github.com/nkzou/cmux-board/internal/tracker"
 	"github.com/nkzou/cmux-board/internal/tracker/jira"
 	"github.com/nkzou/cmux-board/internal/ui"
@@ -230,21 +229,15 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 	}
 	refresher := refresh.NewRefresher(ctx, refreshCfg, tr, store, emitFn)
 
-	// Legacy poller kept alive during T-601 only so NewCoordinator still compiles.
-	// T-603 removes this pin and passes the refresher to NewCoordinator directly.
-	legacyPoller := isync.NewPoller(ctx, &cfg, nil, store, emitFn)
-
-	// Shutdown coordinator.
-	coord := runtime.NewCoordinator(cancel, legacyPoller, store, slog.Default())
+	// Shutdown coordinator drains the refresher on context cancellation.
+	// *refresh.Refresher satisfies runtime.Drainable via its no-arg Wait() method.
+	coord := runtime.NewCoordinator(cancel, refresher, store, slog.Default())
 
 	// Step 9: Run BubbleTea program (blocks until user presses q).
 	// emitCh is drained inside runProgram via prog.Send.
 	if err := deps.runProgram(ctx, &cfg, store, emitCh); err != nil {
 		slog.Error("bubbletea program exited with error", "err", err)
 	}
-
-	// Silence refresher until T-603 passes it to NewCoordinator.
-	_ = refresher
 
 	// Step 10: BubbleTea exited → cancel context → drain → flush.
 	// Cancel first so the Coordinator.Run sees ctx.Done() and proceeds with drain.

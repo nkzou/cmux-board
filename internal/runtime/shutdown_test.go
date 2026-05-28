@@ -10,23 +10,18 @@ import (
 	"time"
 )
 
-// mockPoller implements pollerWaiter for tests.
+// mockPoller implements Drainable for tests.
+// Set blockFor > 0 to simulate a slow drain (longer than drainTimeout).
 type mockPoller struct {
-	blockFor time.Duration // if > 0, Wait blocks this long before returning false
+	blockFor time.Duration // if > 0, Wait blocks this long before returning
 	called   bool
 }
 
-func (m *mockPoller) Wait(timeout time.Duration) bool {
+func (m *mockPoller) Wait() {
 	m.called = true
 	if m.blockFor > 0 {
-		select {
-		case <-time.After(m.blockFor):
-			return false
-		case <-time.After(timeout):
-			return false
-		}
+		time.Sleep(m.blockFor)
 	}
-	return true
 }
 
 // mockStore implements storeFlushable for tests.
@@ -244,6 +239,42 @@ func TestShutdownStoreFlushErrorNotFatal(t *testing.T) {
 	// Error should be logged.
 	if !contains(buf.String(), "flush failed") {
 		t.Errorf("expected 'flush failed' in log output:\n%s", buf.String())
+	}
+}
+
+// fakeDrainable is a minimal Drainable for TestCoordinator_DrainsViaInterface.
+type fakeDrainable struct {
+	waited bool
+}
+
+func (f *fakeDrainable) Wait() { f.waited = true }
+
+// TestCoordinator_DrainsViaInterface verifies that NewCoordinator accepts any
+// Drainable and calls Wait() on shutdown.
+func TestCoordinator_DrainsViaInterface(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	fake := &fakeDrainable{}
+	store := &mockStore{}
+	var buf bytes.Buffer
+	logger := testLogger(&buf)
+
+	c := newCoordinatorFromInterfaces(cancel, fake, store, logger, func(_ int) {})
+
+	done := runCoordinatorWithCancel(ctx, c)
+	time.Sleep(20 * time.Millisecond)
+	cancel() // trigger shutdown via context
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return within 2s")
+	}
+
+	if !fake.waited {
+		t.Error("Drainable.Wait() was not called on shutdown")
+	}
+	if !store.flushCalled {
+		t.Error("store.Flush() was not called on shutdown")
 	}
 }
 
