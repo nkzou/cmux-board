@@ -9,7 +9,7 @@ import (
 
 	"github.com/nkzou/cmux-board/internal/state"
 	"github.com/nkzou/cmux-board/internal/tracker"
-	ui "github.com/nkzou/cmux-board/internal/ui"
+	"github.com/nkzou/cmux-board/internal/ui"
 )
 
 // minRefreshInterval is the hard floor for refresh intervals, matching sync/poller.go.
@@ -109,9 +109,10 @@ func (r *Refresher) tick(
 
 		t, err := tr.GetTicket(ctx, k)
 		if err != nil {
-			slog.Error("refresh: GetTicket failed", "key", k, "error_class", classifyError(err))
+			errClass := classifyError(err)
+			slog.Error("refresh: GetTicket failed", "key", k, "error_class", errClass)
 			emit(ui.PollErrMsg{
-				Code: classifyError(err),
+				Code: errClass,
 				When: time.Now(),
 			})
 			failed = true

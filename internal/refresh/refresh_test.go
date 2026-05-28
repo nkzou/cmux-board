@@ -12,7 +12,7 @@ import (
 
 	"github.com/nkzou/cmux-board/internal/state"
 	"github.com/nkzou/cmux-board/internal/tracker"
-	ui "github.com/nkzou/cmux-board/internal/ui"
+	"github.com/nkzou/cmux-board/internal/ui"
 )
 
 // fakeTracker is a minimal tracker.IssueTracker stub for testing.
