@@ -74,9 +74,10 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case KeyUp, "up":
 		// TODO(T-402c): spatial nearest-neighbor navigation.
 	case KeyActivate:
-		// TODO(T-402c): use m.selectedKey.
-		// Guard: activation requires a selected ticket; no-op until T-402c.
-		return m, nil
+		if m.selectedKey == "" {
+			return m, nil
+		}
+		return m.tryActivate(m.selectedKey)
 	case KeyNewApproach:
 		// Capital N: new approach regardless of existing activations (F16).
 		m.previousMode = ModeNormal
@@ -191,7 +192,7 @@ func (m Model) handleApproachNameMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.previousMode = ModeNormal
-		return m.tryActivate(ticketID, repoID, name)
+		return m.tryActivateWithRepo(ticketID, repoID, name)
 	case KeyApproachCancel:
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Blur()
@@ -304,7 +305,7 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if ps == nil {
 			activations := state.FindActivations(m.snapshot, ticketID, chosenID)
 			if len(activations) == 0 {
-				return m.tryActivate(ticketID, chosenID, "")
+				return m.tryActivateWithRepo(ticketID, chosenID, "")
 			}
 			// 1 activation → focus directly (T-063).
 			return m.focusActivation(activations[0])

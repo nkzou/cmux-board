@@ -22,11 +22,26 @@ func (m Model) spinnerGlyph() string {
 	return spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
 }
 
-// tryActivate guards ActivateCmd against double-activation of the same ticket.
+// tryActivate dispatches activation for the given ticket key.
+// It resolves the repo via resolveRepoAndRoute and then delegates to tryActivateWithRepo.
+// This is the entry point for both keyboard (Enter on selectedKey) and mouse (click-release).
+func (m Model) tryActivate(ticketKey string) (Model, tea.Cmd) {
+	if ticketKey == "" {
+		return m, nil
+	}
+	var res RepoResolution
+	m, res = resolveRepoAndRoute(m, ticketKey)
+	if res.Cancelled || res.PickerOpened {
+		return m, nil
+	}
+	return m.tryActivateWithRepo(ticketKey, res.RepoID, "")
+}
+
+// tryActivateWithRepo guards ActivateCmd against double-activation of the same ticket.
 // If an activation for ticketID is already in flight, a toast is pushed and no
 // Cmd is dispatched. Otherwise the ticket is marked as activating, the spinner
 // tick is armed (if it wasn't already), and ActivateCmd runs.
-func (m Model) tryActivate(ticketID, repoID, approach string) (Model, tea.Cmd) {
+func (m Model) tryActivateWithRepo(ticketID, repoID, approach string) (Model, tea.Cmd) {
 	if m.activatingTickets[ticketID] {
 		return m.pushToast(ticketID + " is already being activated")
 	}
