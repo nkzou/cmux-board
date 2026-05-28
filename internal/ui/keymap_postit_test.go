@@ -32,9 +32,9 @@ func TestNavigate_ArrowRight_SelectsNearestEastNeighbor(t *testing.T) {
 	m := makeTestModelForKeymap(t)
 	m = seedTickets(t, m, map[string]state.TicketState{
 		"A": {Key: "A", Source: "local", X: 0, Y: 0},
-		"B": {Key: "B", Source: "local", X: 20, Y: 0},  // nearest east of A
-		"C": {Key: "C", Source: "local", X: 40, Y: 0},  // farther east
-		"D": {Key: "D", Source: "local", X: 0, Y: 10},  // south, not east
+		"B": {Key: "B", Source: "local", X: 20, Y: 0}, // nearest east of A
+		"C": {Key: "C", Source: "local", X: 40, Y: 0}, // farther east
+		"D": {Key: "D", Source: "local", X: 0, Y: 10}, // south, not east
 	})
 	m.zOrder = []string{"A", "B", "C", "D"}
 	m.selectedKey = "A"
@@ -126,6 +126,13 @@ func TestKey_X_RemovesSelected(t *testing.T) {
 		"A": {Key: "A", Source: "local"},
 		"B": {Key: "B", Source: "local"},
 	})
+	if err := m.store.Mutate(func(s *state.State) error {
+		s.Activations["A"] = []state.ActivationEntry{{ActivationID: "act-a", TicketID: "A"}}
+		s.Activations["B"] = []state.ActivationEntry{{ActivationID: "act-b", TicketID: "B"}}
+		return nil
+	}); err != nil {
+		t.Fatalf("seed activations: %v", err)
+	}
 	m.zOrder = []string{"A", "B"}
 	m.selectedKey = "A"
 
@@ -137,6 +144,12 @@ func TestKey_X_RemovesSelected(t *testing.T) {
 	}
 	if _, exists := snap.Tickets["B"]; !exists {
 		t.Error("ticket B should still exist")
+	}
+	if _, exists := snap.Activations["A"]; exists {
+		t.Error("ticket A activations should have been removed")
+	}
+	if _, exists := snap.Activations["B"]; !exists {
+		t.Error("ticket B activations should still exist")
 	}
 }
 

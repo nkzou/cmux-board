@@ -91,6 +91,32 @@ func TestCanvas_TwoNonOverlapping(t *testing.T) {
 	}
 }
 
+func TestCanvas_FilterLeavesNonMatchesVisibleButDimmed(t *testing.T) {
+	t.Parallel()
+	tickets := map[string]state.TicketState{
+		"A": {Key: "A", Summary: "Alpha card", X: 0, Y: 0},
+		"B": {Key: "B", Summary: "Beta card", X: 40, Y: 0},
+	}
+	m := makeCanvasModel(t, 80, 24, tickets, []string{"A", "B"})
+	m.filterQuery = "alpha"
+
+	snap, _ := m.store.Snapshot()
+	if m.ticketFilteredOut(snap.Tickets["A"]) {
+		t.Error("matching ticket should not be dimmed")
+	}
+	if !m.ticketFilteredOut(snap.Tickets["B"]) {
+		t.Error("nonmatching ticket should be dimmed")
+	}
+
+	out := m.renderPostitCanvas()
+	if !strings.Contains(out, "Alpha card") {
+		t.Errorf("expected matching card in canvas:\n%s", out)
+	}
+	if !strings.Contains(out, "Beta card") {
+		t.Errorf("expected nonmatching card to remain visible:\n%s", out)
+	}
+}
+
 func TestCanvas_TwoOverlapping_TopWins(t *testing.T) {
 	t.Parallel()
 	// A and B at same position; B is on top (last in zOrder).

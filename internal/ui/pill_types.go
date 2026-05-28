@@ -56,4 +56,8 @@ type repoPickerState struct {
 	// manageIntent is true when the picker was opened via KeyManage; on selection
 	// the activation picker opens instead of triggering activation.
 	manageIntent bool
+	// pendingApproach carries a name entered via ModeApproachName through repo
+	// selection. When set, repo selection starts a new activation instead of
+	// focusing an existing one.
+	pendingApproach string
 }

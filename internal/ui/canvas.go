@@ -27,18 +27,15 @@ func (m *Model) renderPostitCanvas() string {
 	snap, _ := m.store.Snapshot()
 	m.reconcileZOrder(snap)
 
-	if len(snap.Tickets) == 0 && m.mode == ModeNormal {
-		return centeredHint(m.width, m.height,
-			"Press `i` to import a Jira ticket, `c` to create a local post-it. Press `?` for help.")
-	}
-
-	h := m.height
-	if h <= 0 {
-		h = 24
-	}
+	h := m.canvasHeight()
 	w := m.width
 	if w <= 0 {
-		w = 80
+		w = defaultTerminalWidth
+	}
+
+	if len(snap.Tickets) == 0 && m.mode == ModeNormal {
+		return centeredHint(w, h,
+			"Press `i` to import a Jira ticket, `c` to create a local post-it. Press `?` for help.")
 	}
 
 	// Allocate one string per canvas row, each filled with spaces.
@@ -61,6 +58,7 @@ func (m *Model) renderPostitCanvas() string {
 		cardStr := renderTicket(renderTicketParams{
 			ticket:       ticketStateToUI(ticket, m.activatingTickets[k], state.ActivationCount(snap, k)),
 			isSelected:   k == m.selectedKey,
+			filteredOut:  m.ticketFilteredOut(ticket),
 			width:        cardW,
 			accentColor:  colors.primary,
 			colors:       colors,
@@ -98,6 +96,25 @@ func (m *Model) renderPostitCanvas() string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+const (
+	defaultTerminalWidth  = 80
+	defaultTerminalHeight = 24
+	headerRows            = 2
+	statusRows            = 1
+)
+
+func (m Model) canvasHeight() int {
+	h := m.height
+	if h <= 0 {
+		h = defaultTerminalHeight
+	}
+	h -= headerRows + statusRows
+	if h < 1 {
+		return 1
+	}
+	return h
 }
 
 // reconcileZOrder synchronizes m.zOrder with snap.Tickets.
@@ -176,10 +193,10 @@ func spliceLine(dst string, atX int, ins string, total int) string {
 // help hint. Used for the first-run empty-board case (Review F-11).
 func centeredHint(w, h int, hint string) string {
 	if w <= 0 {
-		w = 80
+		w = defaultTerminalWidth
 	}
 	if h <= 0 {
-		h = 24
+		h = defaultTerminalHeight
 	}
 
 	style := lipgloss.NewStyle().

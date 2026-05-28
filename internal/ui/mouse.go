@@ -114,7 +114,7 @@ func (m Model) handleMouseMotion(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if snap, _ := m.store.Snapshot(); snap != nil {
 		if t, ok := snap.Tickets[ds.key]; ok {
 			nx, ny := uispatial.ApplyDelta(t.X, t.Y, ds.pressX, ds.pressY, msg.X, msg.Y)
-			nx, ny = uispatial.Clamp(nx, ny, cardWidth(m.width), cardHeight(), m.width, m.height)
+			nx, ny = uispatial.Clamp(nx, ny, cardWidth(m.width), cardHeight(), m.width, m.canvasHeight())
 			ds.currentX, ds.currentY = nx, ny
 		}
 	}
@@ -159,7 +159,7 @@ func (m Model) handleMouseRelease(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	newX, newY := uispatial.ApplyDelta(card.X, card.Y, pressX, pressY, msg.X, msg.Y)
-	newX, newY = uispatial.Clamp(newX, newY, cardWidth(m.width), cardHeight(), m.width, m.height)
+	newX, newY = uispatial.Clamp(newX, newY, cardWidth(m.width), cardHeight(), m.width, m.canvasHeight())
 
 	if err := m.store.Mutate(func(s *state.State) error {
 		state.SetTicketPosition(s, key, newX, newY)

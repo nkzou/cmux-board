@@ -107,7 +107,8 @@ func rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh int) bool {
 	return !(ax+aw <= bx || bx+bw <= ax || ay+ah <= by || by+bh <= ay)
 }
 
-// RemoveTicket deletes the ticket identified by key from s.Tickets.
+// RemoveTicket deletes the ticket identified by key from s.Tickets and removes
+// any activation records bound to that ticket.
 // It is a no-op when key is absent.
 //
 // MUST be called inside a Store.Mutate closure. Direct invocation on a *State
@@ -115,6 +116,7 @@ func rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh int) bool {
 // returned by Snapshot is intentionally disposable.
 func RemoveTicket(s *State, key string) {
 	delete(s.Tickets, key)
+	delete(s.Activations, key)
 }
 
 // SetTicketPosition updates the (X, Y) board coordinates for the ticket identified

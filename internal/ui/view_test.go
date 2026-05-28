@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -73,6 +74,19 @@ func TestView_EmptyBoard(t *testing.T) {
 	// Should contain the board id from cfg.
 	if !containsStr(rendered, "test-board") {
 		t.Errorf("expected board id in view output:\n%s", rendered)
+	}
+}
+
+func TestView_CanvasUsesAvailableHeight(t *testing.T) {
+	t.Parallel()
+	snap := buildTestSnap(nil)
+	m := makeViewTestModel(t, snap, nil)
+	m.height = 10
+
+	rendered := m.View()
+	lines := strings.Count(rendered, "\n") + 1
+	if lines != m.height {
+		t.Errorf("View() rendered %d lines, want terminal height %d", lines, m.height)
 	}
 }
 

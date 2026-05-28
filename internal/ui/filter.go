@@ -21,8 +21,7 @@ func filterTickets(tickets map[string]*state.TicketState, query string) []string
 	lower := strings.ToLower(query)
 	var out []string
 	for id, t := range tickets {
-		if strings.Contains(strings.ToLower(t.Key), lower) ||
-			strings.Contains(strings.ToLower(t.Summary), lower) {
+		if t != nil && ticketMatchesFilter(*t, lower) {
 			out = append(out, id)
 		}
 	}
@@ -42,12 +41,26 @@ func filterTicketsByState(tickets map[string]state.TicketState, query string) []
 	lower := strings.ToLower(query)
 	var out []string
 	for id, t := range tickets {
-		if strings.Contains(strings.ToLower(t.Key), lower) ||
-			strings.Contains(strings.ToLower(t.Summary), lower) {
+		if ticketMatchesFilter(t, lower) {
 			out = append(out, id)
 		}
 	}
 	return out
+}
+
+// ticketMatchesFilter reports whether a ticket should be emphasized for query.
+// query may already be lower-cased by callers.
+func ticketMatchesFilter(t state.TicketState, query string) bool {
+	if query == "" {
+		return true
+	}
+	lower := strings.ToLower(query)
+	return strings.Contains(strings.ToLower(t.Key), lower) ||
+		strings.Contains(strings.ToLower(t.Summary), lower)
+}
+
+func (m Model) ticketFilteredOut(t state.TicketState) bool {
+	return m.filterQuery != "" && !ticketMatchesFilter(t, m.filterQuery)
 }
 
 // handleFilterMode handles key events when mode == ModeFilter.

@@ -183,10 +183,18 @@ func TestRemoveTicket_DeletesByKey(t *testing.T) {
 	t.Parallel()
 	s := DefaultState()
 	s.Tickets["PROJ-4"] = TicketState{Key: "PROJ-4", Source: "jira"}
+	s.Activations["PROJ-4"] = []ActivationEntry{{ActivationID: "act-1", TicketID: "PROJ-4"}}
+	s.Activations["PROJ-5"] = []ActivationEntry{{ActivationID: "act-2", TicketID: "PROJ-5"}}
 
 	RemoveTicket(&s, "PROJ-4")
 	if _, ok := s.Tickets["PROJ-4"]; ok {
 		t.Error("PROJ-4 should have been deleted")
+	}
+	if _, ok := s.Activations["PROJ-4"]; ok {
+		t.Error("PROJ-4 activations should have been deleted")
+	}
+	if _, ok := s.Activations["PROJ-5"]; !ok {
+		t.Error("PROJ-5 activations should remain")
 	}
 
 	// No-op for absent key.

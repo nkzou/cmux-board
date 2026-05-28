@@ -320,7 +320,6 @@ func (m Model) handlePickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.mode = ModeNormal
 		return m.focusActivation(entry)
 	case KeyPickerNew:
-		m.pickerState = nil
 		m.previousMode = ModePicker
 		m.mode = ModeApproachName
 		m.approachNameInput.SetValue("")
@@ -388,9 +387,25 @@ func (m Model) handleApproachNameMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			repoID = m.pickerState.repoID
 			m.pickerState = nil
 		} else {
-			// TODO(T-402c): use m.selectedKey for ticketID once navigation is wired.
-			// Guard until T-402c: no-op if no selectedKey.
-			return m, nil
+			ticketID = m.selectedKey
+			if ticketID == "" {
+				m.previousMode = ModeNormal
+				return m, nil
+			}
+			var res RepoResolution
+			m, res = resolveRepoAndRoute(m, ticketID)
+			if res.Cancelled {
+				m.previousMode = ModeNormal
+				return m, nil
+			}
+			if res.PickerOpened {
+				if m.repoPicker != nil {
+					m.repoPicker.pendingApproach = name
+				}
+				m.previousMode = ModeNormal
+				return m, nil
+			}
+			repoID = res.RepoID
 		}
 		m.previousMode = ModeNormal
 		return m.tryActivateWithRepo(ticketID, repoID, name)
@@ -478,6 +493,7 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		ticketID := rp.ticketID
 		firstTouch := rp.firstTouch
 		manageIntent := rp.manageIntent
+		pendingApproach := rp.pendingApproach
 		chosenID := row.repoID
 		m.repoPicker = nil
 		m.mode = ModeNormal
@@ -499,6 +515,10 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.pickerState = forcePickerState(m.snapshot, ticketID, chosenID)
 			m.mode = ModePicker
 			return m, nil
+		}
+
+		if pendingApproach != "" {
+			return m.tryActivateWithRepo(ticketID, chosenID, pendingApproach)
 		}
 
 		// Normal activation flow: check activations for (ticketID, chosenID).

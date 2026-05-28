@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/nkzou/cmux-board/internal/state"
@@ -56,8 +57,10 @@ func TestConcurrentMutateAdd50(t *testing.T) {
 
 // TestRefreshVsActivateParallelism simulates the most common real-world race condition:
 // a background refresher writing updated ticket data concurrently with an activation
-// orchestrator appending an ActivationEntry. 1000 iterations, each with a per-iteration
-// start-gate, plus random micro-sleeps to maximise interleaving.
+// orchestrator appending an ActivationEntry. Each iteration has a per-iteration
+// start-gate, plus random sleeps under synctest to maximise ordering variation
+// without real-time waits. The iteration count is intentionally bounded because
+// every Mutate still performs real atomic state-file persistence under -race.
 // Ties to: F17, CONVENTIONS.md poll-merge contract.
 func TestRefreshVsActivateParallelism(t *testing.T) {
 	t.Parallel()
@@ -81,63 +84,65 @@ func TestRefreshVsActivateParallelism(t *testing.T) {
 		t.Fatalf("seed Mutate: %v", err)
 	}
 
-	const iterations = 1000
+	const iterations = 100
 
-	for iter := range iterations {
-		ready := make(chan struct{})
-		var wg sync.WaitGroup
-		wg.Add(2)
+	synctest.Test(t, func(t *testing.T) {
+		for iter := range iterations {
+			ready := make(chan struct{})
+			var wg sync.WaitGroup
+			wg.Add(2)
 
-		// actID is long enough to take an 8-char prefix safely.
-		actID := fmt.Sprintf("act-%08d", iter)
+			// actID is long enough to take an 8-char prefix safely.
+			actID := fmt.Sprintf("act-%08d", iter)
 
-		// Goroutine A: refresher-style — update status/summary on existing ticket only.
-		// This simulates the new read-only refresher writing data fields via Mutate.
-		go func() {
-			defer wg.Done()
-			<-ready
-			// Local rng per goroutine — no shared state.
-			sleep := rand.New(rand.NewSource(int64(iter * 2))).Int63n(5000) //nolint:gosec
-			time.Sleep(time.Duration(sleep))
-			if err := store.Mutate(func(s *state.State) error {
-				for key, ts := range s.Tickets {
-					if ts.Source == "jira" {
-						ts.Status = "In Progress"
-						s.Tickets[key] = ts
+			// Goroutine A: refresher-style — update status/summary on existing ticket only.
+			// This simulates the new read-only refresher writing data fields via Mutate.
+			go func() {
+				defer wg.Done()
+				<-ready
+				// Local rng per goroutine — no shared state.
+				sleep := rand.New(rand.NewSource(int64(iter * 2))).Int63n(5000) //nolint:gosec
+				time.Sleep(time.Duration(sleep))
+				if err := store.Mutate(func(s *state.State) error {
+					for key, ts := range s.Tickets {
+						if ts.Source == "jira" {
+							ts.Status = "In Progress"
+							s.Tickets[key] = ts
+						}
 					}
+					return nil
+				}); err != nil {
+					t.Errorf("iter %d refresher Mutate: %v", iter, err)
 				}
-				return nil
-			}); err != nil {
-				t.Errorf("iter %d refresher Mutate: %v", iter, err)
-			}
-		}()
+			}()
 
-		// Goroutine B: activator-style — append an ActivationEntry for PROJ-1.
-		go func() {
-			defer wg.Done()
-			<-ready
-			sleep := rand.New(rand.NewSource(int64(iter*2 + 1))).Int63n(5000) //nolint:gosec
-			time.Sleep(time.Duration(sleep))
-			if err := store.Mutate(func(s *state.State) error {
-				if s.Activations == nil {
-					s.Activations = make(map[string][]state.ActivationEntry)
+			// Goroutine B: activator-style — append an ActivationEntry for PROJ-1.
+			go func() {
+				defer wg.Done()
+				<-ready
+				sleep := rand.New(rand.NewSource(int64(iter*2 + 1))).Int63n(5000) //nolint:gosec
+				time.Sleep(time.Duration(sleep))
+				if err := store.Mutate(func(s *state.State) error {
+					if s.Activations == nil {
+						s.Activations = make(map[string][]state.ActivationEntry)
+					}
+					s.Activations["PROJ-1"] = append(s.Activations["PROJ-1"], state.ActivationEntry{
+						ActivationID: actID,
+						ActIDShort:   actID[:8],
+						TicketID:     "PROJ-1",
+						RepoID:       "my-service",
+						Step:         state.StepStarted,
+					})
+					return nil
+				}); err != nil {
+					t.Errorf("iter %d activator Mutate: %v", iter, err)
 				}
-				s.Activations["PROJ-1"] = append(s.Activations["PROJ-1"], state.ActivationEntry{
-					ActivationID: actID,
-					ActIDShort:   actID[:8],
-					TicketID:     "PROJ-1",
-					RepoID:       "my-service",
-					Step:         state.StepStarted,
-				})
-				return nil
-			}); err != nil {
-				t.Errorf("iter %d activator Mutate: %v", iter, err)
-			}
-		}()
+			}()
 
-		close(ready) // fire both goroutines simultaneously
-		wg.Wait()
-	}
+			close(ready) // fire both goroutines simultaneously
+			wg.Wait()
+		}
+	})
 
 	snap, _ := store.Snapshot()
 

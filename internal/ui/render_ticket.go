@@ -12,6 +12,7 @@ type renderTicketParams struct {
 	ticket      Ticket
 	isSelected  bool
 	isHovered   bool
+	filteredOut bool
 	width       int
 	accentColor lipgloss.Color
 	colors      uiColors
@@ -43,6 +44,11 @@ func statusBorder(t Ticket, colors uiColors) lipgloss.Color {
 // renderTicket renders a single kanban ticket card.
 // TODO(M-006): add [orphan] glyph when claude_orphan:true
 func renderTicket(p renderTicketParams) string {
+	if p.filteredOut {
+		p.colors = dimmedColors(p.colors)
+		p.accentColor = p.colors.muted
+	}
+
 	var headerParts []string
 
 	// Source badge for local tickets.
@@ -157,9 +163,28 @@ func renderTicket(p renderTicketParams) string {
 		BorderForeground(borderColor).
 		Padding(0, 1).
 		Width(p.width)
+	if p.filteredOut {
+		cardStyle = cardStyle.Faint(true)
+	}
 	// No MarginBottom — a trailing empty row inside zone.Mark would extend the
 	// drag hit zone past the visible card, breaking the "what I see is what I
 	// can click" expectation on a freeform 2D board.
 
 	return cardStyle.Render(content)
+}
+
+func dimmedColors(colors uiColors) uiColors {
+	colors.text = colors.muted
+	colors.subtext = colors.muted
+	colors.primary = colors.overlay
+	colors.secondary = colors.muted
+	colors.success = colors.muted
+	colors.warning = colors.muted
+	colors.err = colors.muted
+	colors.info = colors.muted
+	colors.BorderOpen = colors.muted
+	colors.BorderInProgress = colors.muted
+	colors.BorderDone = colors.muted
+	colors.BorderNeutral = colors.muted
+	return colors
 }
