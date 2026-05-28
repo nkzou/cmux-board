@@ -1,3 +1,8 @@
+// Package refresh provides tests for the Refresher type.
+// Tests that involve the ticker-driven loop use [testing/synctest] for deterministic
+// time control. The synctest bubble provides a fake clock so time.NewTicker advances
+// only when all goroutines in the bubble are durably blocked, eliminating wall-clock
+// sleeps and the associated flake surface. See https://pkg.go.dev/testing/synctest.
 package refresh
 
 import (
@@ -6,21 +11,22 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/nkzou/cmux-board/internal/state"
 	"github.com/nkzou/cmux-board/internal/tracker"
 	"github.com/nkzou/cmux-board/internal/ui"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // fakeTracker is a minimal tracker.IssueTracker stub for testing.
 type fakeTracker struct {
-	mu       sync.Mutex
-	calls    []string // keys passed to GetTicket
-	results  map[string]tracker.Ticket
-	errors   map[string]error
+	mu      sync.Mutex
+	calls   []string // keys passed to GetTicket
+	results map[string]tracker.Ticket
+	errors  map[string]error
 }
 
 func newFakeTracker() *fakeTracker {
@@ -93,17 +99,6 @@ func (r *msgRecorder) all() []tea.Msg {
 	return cp
 }
 
-func (r *msgRecorder) waitForN(n int, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if len(r.all()) >= n {
-			return true
-		}
-		time.Sleep(2 * time.Millisecond)
-	}
-	return false
-}
-
 // openTestStore creates a real state.Store backed by a temp file.
 func openTestStore(t *testing.T) *state.Store {
 	t.Helper()
@@ -151,41 +146,51 @@ func addLocalTicket(t *testing.T, store *state.Store, key string) {
 	}
 }
 
+// tickInterval is the test interval used in synctest bubbles.
+// It must be large enough that fake-time advances are visible but is instant in wall-clock.
+const tickInterval = 1 * time.Second
+
 // TestTick_NoImported_NoTrackerCalls verifies that an empty Tickets map produces
 // zero GetTicket calls and one PollOKMsg.
+//
+// Uses [testing/synctest] for deterministic ticker control.
 func TestTick_NoImported_NoTrackerCalls(t *testing.T) {
-	t.Parallel()
+	// Store is opened outside the bubble (filesystem I/O before the bubble).
 	store := openTestStore(t)
 	ft := newFakeTracker()
 	rec := &msgRecorder{}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	r := newRefresher(ctx, 10*time.Millisecond, ft, store, rec.emit)
+		r := newRefresher(ctx, tickInterval, ft, store, rec.emit)
 
-	if !rec.waitForN(1, 2*time.Second) {
-		t.Fatal("no message emitted within timeout")
-	}
-	cancel()
-	r.Wait()
+		// Advance fake time past one interval → ticker fires.
+		time.Sleep(tickInterval)
+		synctest.Wait()
 
-	if ft.callCount() != 0 {
-		t.Errorf("want 0 GetTicket calls; got %d", ft.callCount())
-	}
-	msgs := rec.all()
-	if len(msgs) == 0 {
-		t.Fatal("want at least 1 message")
-	}
-	if _, ok := msgs[0].(ui.PollOKMsg); !ok {
-		t.Errorf("want PollOKMsg; got %T", msgs[0])
-	}
+		cancel()
+		r.Wait()
+
+		if ft.callCount() != 0 {
+			t.Errorf("want 0 GetTicket calls; got %d", ft.callCount())
+		}
+		msgs := rec.all()
+		if len(msgs) == 0 {
+			t.Fatal("want at least 1 message")
+		}
+		if _, ok := msgs[0].(ui.PollOKMsg); !ok {
+			t.Errorf("want PollOKMsg; got %T", msgs[0])
+		}
+	})
 }
 
 // TestTick_RefreshesOnlyJiraSource verifies that 2 jira + 1 local → exactly 2 GetTicket calls
 // per tick, and the local ticket's fields are untouched.
+//
+// Uses [testing/synctest] for deterministic ticker control.
 func TestTick_RefreshesOnlyJiraSource(t *testing.T) {
-	t.Parallel()
 	store := openTestStore(t)
 	ft := newFakeTracker()
 	rec := &msgRecorder{}
@@ -197,50 +202,46 @@ func TestTick_RefreshesOnlyJiraSource(t *testing.T) {
 	ft.results["PROJ-1"] = tracker.Ticket{Key: "PROJ-1", Summary: "updated 1", Status: "in-progress"}
 	ft.results["PROJ-2"] = tracker.Ticket{Key: "PROJ-2", Summary: "updated 2", Status: "done"}
 
-	// Use a long interval so only one tick fires; cancel after first message.
-	ctx, cancel := context.WithCancel(context.Background())
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	r := newRefresher(ctx, 500*time.Millisecond, ft, store, rec.emit)
+		r := newRefresher(ctx, tickInterval, ft, store, rec.emit)
 
-	if !rec.waitForN(1, 3*time.Second) {
+		// Advance past exactly one interval → exactly one tick fires.
+		time.Sleep(tickInterval)
+		synctest.Wait()
+
 		cancel()
-		t.Fatal("no message emitted within timeout")
-	}
-	cancel()
-	r.Wait()
+		r.Wait()
 
-	// With interval=500ms and early cancel, only 1 tick should have fired.
-	// Each tick visits 2 jira tickets → 2 calls (or multiples if more ticks fired, but
-	// the important invariant is calls%2==0 and LOCAL-1 was never called).
-	keys := ft.calledKeys()
-	for _, k := range keys {
-		if k == "LOCAL-1" {
-			t.Errorf("GetTicket called for local ticket LOCAL-1")
+		// Exactly one tick: 2 jira tickets → 2 GetTicket calls.
+		keys := ft.calledKeys()
+		if len(keys) != 2 {
+			t.Errorf("want 2 GetTicket calls; got %d: %v", len(keys), keys)
 		}
-	}
-	if len(keys) == 0 {
-		t.Error("want GetTicket calls for jira tickets; got 0")
-	}
-	if len(keys)%2 != 0 {
-		t.Errorf("expected even number of GetTicket calls (2 jira tickets); got %d: %v", len(keys), keys)
-	}
+		for _, k := range keys {
+			if k == "LOCAL-1" {
+				t.Errorf("GetTicket called for local ticket LOCAL-1")
+			}
+		}
 
-	snap, _ := store.Snapshot()
-
-	// local ticket must be untouched
-	local := snap.Tickets["LOCAL-1"]
-	if local.Source != "local" {
-		t.Errorf("local ticket source changed: got %q", local.Source)
-	}
-	if local.Summary != "local ticket" {
-		t.Errorf("local ticket summary changed: got %q", local.Summary)
-	}
+		snap, _ := store.Snapshot()
+		local := snap.Tickets["LOCAL-1"]
+		if local.Source != "local" {
+			t.Errorf("local ticket source changed: got %q", local.Source)
+		}
+		if local.Summary != "local ticket" {
+			t.Errorf("local ticket summary changed: got %q", local.Summary)
+		}
+	})
 }
 
 // TestTick_PartialFailure_EmitsErrAndKeepsRunning verifies that one erroring key emits
 // PollErrMsg and the refresher continues; the succeeding key's fields are updated.
+//
+// Uses [testing/synctest] for deterministic ticker control.
 func TestTick_PartialFailure_EmitsErrAndKeepsRunning(t *testing.T) {
-	t.Parallel()
 	store := openTestStore(t)
 	ft := newFakeTracker()
 	rec := &msgRecorder{}
@@ -251,98 +252,102 @@ func TestTick_PartialFailure_EmitsErrAndKeepsRunning(t *testing.T) {
 	ft.errors["PROJ-1"] = errors.New("network error")
 	ft.results["PROJ-2"] = tracker.Ticket{Key: "PROJ-2", Summary: "updated", Status: "done"}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	r := newRefresher(ctx, 10*time.Millisecond, ft, store, rec.emit)
+		r := newRefresher(ctx, tickInterval, ft, store, rec.emit)
 
-	if !rec.waitForN(1, 2*time.Second) {
-		t.Fatal("no message emitted within timeout")
-	}
-	cancel()
-	r.Wait()
+		// Advance past one interval → tick fires, processes both tickets.
+		time.Sleep(tickInterval)
+		synctest.Wait()
 
-	msgs := rec.all()
-	var sawErr bool
-	for _, m := range msgs {
-		if _, ok := m.(ui.PollErrMsg); ok {
-			sawErr = true
+		cancel()
+		r.Wait()
+
+		msgs := rec.all()
+		var sawErr bool
+		for _, m := range msgs {
+			if _, ok := m.(ui.PollErrMsg); ok {
+				sawErr = true
+			}
 		}
-	}
-	if !sawErr {
-		t.Error("want PollErrMsg; none received")
-	}
+		if !sawErr {
+			t.Error("want PollErrMsg; none received")
+		}
 
-	// PROJ-2 must be updated despite PROJ-1 failing
-	snap, _ := store.Snapshot()
-	if snap.Tickets["PROJ-2"].Summary != "updated" {
-		t.Errorf("PROJ-2 summary not updated: got %q", snap.Tickets["PROJ-2"].Summary)
-	}
+		// PROJ-2 must be updated despite PROJ-1 failing.
+		snap, _ := store.Snapshot()
+		if snap.Tickets["PROJ-2"].Summary != "updated" {
+			t.Errorf("PROJ-2 summary not updated: got %q", snap.Tickets["PROJ-2"].Summary)
+		}
+	})
 }
 
-// TestCancel_ContextDone_StopsLoop verifies that cancel() stops the loop within 100ms.
+// TestCancel_ContextDone_StopsLoop verifies that cancel() stops the loop within one fake-tick.
+//
+// Uses [testing/synctest] for deterministic ticker control.
 func TestCancel_ContextDone_StopsLoop(t *testing.T) {
-	t.Parallel()
 	store := openTestStore(t)
 	ft := newFakeTracker()
 	rec := &msgRecorder{}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
 
-	r := newRefresher(ctx, 10*time.Millisecond, ft, store, rec.emit)
+		r := newRefresher(ctx, tickInterval, ft, store, rec.emit)
 
-	cancel()
-	done := make(chan struct{})
-	go func() {
+		// Cancel before any tick fires.
+		cancel()
+
+		// synctest.Wait() will unblock once the goroutine returns to select and both
+		// ctx.Done() and the cancel are processed — the loop exits.
+		synctest.Wait()
 		r.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// ok
-	case <-time.After(200 * time.Millisecond):
-		t.Error("goroutine did not exit within 200ms after cancel")
-	}
+		// If Wait returns we know the goroutine exited cleanly.
+	})
 }
 
 // TestRefresh_NeverInsertsOrDeletes verifies that the refresher does not insert new
 // tickets even when GetTicket returns a key not in state.Tickets.
+//
+// Uses [testing/synctest] for deterministic ticker control.
 func TestRefresh_NeverInsertsOrDeletes(t *testing.T) {
-	t.Parallel()
 	store := openTestStore(t)
 	ft := newFakeTracker()
 	rec := &msgRecorder{}
 
-	// Only PROJ-1 is in state; GetTicket will also "return" PROJ-99 implicitly
-	// (via the default result path of fakeTracker), but PROJ-99 is never in state.
 	addJiraTicket(t, store, "PROJ-1", "todo", "orig")
 	ft.results["PROJ-1"] = tracker.Ticket{Key: "PROJ-1", Summary: "new", Status: "done"}
 
 	snap0, _ := store.Snapshot()
 	ticketsBefore := len(snap0.Tickets)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	r := newRefresher(ctx, 10*time.Millisecond, ft, store, rec.emit)
+		r := newRefresher(ctx, tickInterval, ft, store, rec.emit)
 
-	if !rec.waitForN(1, 2*time.Second) {
-		t.Fatal("no message emitted within timeout")
-	}
-	cancel()
-	r.Wait()
+		// One tick.
+		time.Sleep(tickInterval)
+		synctest.Wait()
 
-	snap, _ := store.Snapshot()
-	if len(snap.Tickets) != ticketsBefore {
-		t.Errorf("ticket count changed: before=%d after=%d", ticketsBefore, len(snap.Tickets))
-	}
+		cancel()
+		r.Wait()
+
+		snap, _ := store.Snapshot()
+		if len(snap.Tickets) != ticketsBefore {
+			t.Errorf("ticket count changed: before=%d after=%d", ticketsBefore, len(snap.Tickets))
+		}
+	})
 }
 
 // TestRefresh_PreservesPositionAndSource verifies that X, Y, Source, LocalStatus,
 // and AssignedRepoIDs are not modified by the refresher.
+//
+// Uses [testing/synctest] for deterministic ticker control.
 func TestRefresh_PreservesPositionAndSource(t *testing.T) {
-	t.Parallel()
 	store := openTestStore(t)
 	ft := newFakeTracker()
 	rec := &msgRecorder{}
@@ -369,34 +374,36 @@ func TestRefresh_PreservesPositionAndSource(t *testing.T) {
 		Status:  "done",
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	r := newRefresher(ctx, 10*time.Millisecond, ft, store, rec.emit)
+		r := newRefresher(ctx, tickInterval, ft, store, rec.emit)
 
-	if !rec.waitForN(1, 2*time.Second) {
-		t.Fatal("no message emitted within timeout")
-	}
-	cancel()
-	r.Wait()
+		// One tick.
+		time.Sleep(tickInterval)
+		synctest.Wait()
 
-	snap, _ := store.Snapshot()
-	ts := snap.Tickets["PROJ-1"]
+		cancel()
+		r.Wait()
 
-	if ts.X != 7 || ts.Y != 11 {
-		t.Errorf("position changed: X=%d Y=%d (want 7,11)", ts.X, ts.Y)
-	}
-	if ts.Source != "jira" {
-		t.Errorf("Source changed: got %q", ts.Source)
-	}
-	if len(ts.AssignedRepoIDs) != 2 {
-		t.Errorf("AssignedRepoIDs changed: got %v", ts.AssignedRepoIDs)
-	}
-	// Data fields must be updated
-	if ts.Summary != "refreshed" {
-		t.Errorf("Summary not updated: got %q", ts.Summary)
-	}
-	if ts.Status != "done" {
-		t.Errorf("Status not updated: got %q", ts.Status)
-	}
+		snap, _ := store.Snapshot()
+		ts := snap.Tickets["PROJ-1"]
+
+		if ts.X != 7 || ts.Y != 11 {
+			t.Errorf("position changed: X=%d Y=%d (want 7,11)", ts.X, ts.Y)
+		}
+		if ts.Source != "jira" {
+			t.Errorf("Source changed: got %q", ts.Source)
+		}
+		if len(ts.AssignedRepoIDs) != 2 {
+			t.Errorf("AssignedRepoIDs changed: got %v", ts.AssignedRepoIDs)
+		}
+		if ts.Summary != "refreshed" {
+			t.Errorf("Summary not updated: got %q", ts.Summary)
+		}
+		if ts.Status != "done" {
+			t.Errorf("Status not updated: got %q", ts.Status)
+		}
+	})
 }
