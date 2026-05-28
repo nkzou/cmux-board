@@ -69,24 +69,6 @@ const (
 	StepCmuxCreated     = "cmux_created"
 )
 
-// BoardSnapshot caches the last-known board layout.
-// Retained as a standalone type for internal/sync/ (deleted in M-6/T-602) and
-// internal/ui/ (rewritten in M-4). Not stored on State in schema v3.
-type BoardSnapshot struct {
-	BoardID   string           `json:"board_id,omitempty"`
-	BoardName string           `json:"board_name,omitempty"`
-	Columns   []ColumnSnapshot `json:"columns,omitempty"`
-}
-
-// ColumnSnapshot caches one board column's layout.
-// Retained as a standalone type for internal/sync/ (deleted in M-6/T-602) and
-// internal/ui/ (rewritten in M-4). Not stored on State in schema v3.
-type ColumnSnapshot struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	StatusIDs []string `json:"status_ids,omitempty"`
-}
-
 // DefaultState returns an empty State with the current schema version.
 func DefaultState() State {
 	return State{
