@@ -23,6 +23,7 @@ const workitemSearchJSON = `[
     "key": "TESTPROJ-42",
     "fields": {
       "summary": "Fix the bug",
+      "issuetype": {"name": "Bug"},
       "status": {"id": "3", "name": "In Progress"},
       "assignee": {"accountId": "acc-1", "emailAddress": "user@example.com"},
       "priority": {"name": "High"}
@@ -58,8 +59,14 @@ func TestListTicketsHappyPath(t *testing.T) {
 	if tk.Status != "In Progress" {
 		t.Errorf("Status: got %q, want %q", tk.Status, "In Progress")
 	}
+	if tk.IssueType != "Bug" {
+		t.Errorf("IssueType: got %q, want %q", tk.IssueType, "Bug")
+	}
 	if tk.AssigneeID != "acc-1" {
 		t.Errorf("AssigneeID: got %q, want %q", tk.AssigneeID, "acc-1")
+	}
+	if tk.AssigneeEmail != "user@example.com" {
+		t.Errorf("AssigneeEmail: got %q, want %q", tk.AssigneeEmail, "user@example.com")
 	}
 	if tk.Priority != "High" {
 		t.Errorf("Priority: got %q, want %q", tk.Priority, "High")
@@ -193,6 +200,7 @@ func TestListTicketsNullableFields(t *testing.T) {
 		"id": "1", "key": "TESTPROJ-1",
 		"fields": {
 			"summary": "No assignee or priority",
+			"issuetype": null,
 			"status": {"id": "1", "name": "To Do"},
 			"assignee": null,
 			"priority": null
@@ -213,6 +221,12 @@ func TestListTicketsNullableFields(t *testing.T) {
 	}
 	if tickets[0].AssigneeID != "" {
 		t.Errorf("AssigneeID: got %q, want empty for null assignee", tickets[0].AssigneeID)
+	}
+	if tickets[0].AssigneeEmail != "" {
+		t.Errorf("AssigneeEmail: got %q, want empty for null assignee", tickets[0].AssigneeEmail)
+	}
+	if tickets[0].IssueType != "" {
+		t.Errorf("IssueType: got %q, want empty for null issuetype", tickets[0].IssueType)
 	}
 	if tickets[0].Priority != "" {
 		t.Errorf("Priority: got %q, want empty for null priority", tickets[0].Priority)

@@ -9,9 +9,9 @@ import (
 // ImportJiraTicket upserts a tracker-sourced ticket into s.Tickets.
 // If the ticket is absent, it is inserted with Source: "jira", X: 0, Y: 0, and
 // AssignedRepoIDs initialized to an empty (non-nil) slice.
-// If the ticket is already present, tracker-owned fields (Summary, Status, URL,
-// Labels, Priority, AssigneeID) are updated; local-only fields (X, Y, Source,
-// AssignedRepoIDs) are preserved.
+// If the ticket is already present, tracker-owned fields (ID, Summary, Status, URL,
+// IssueType, Labels, Priority, AssigneeID, AssigneeEmail, UpdatedAt) are updated;
+// local-only fields (X, Y, Source, AssignedRepoIDs) are preserved.
 //
 // MUST be called inside a Store.Mutate closure. Direct invocation on a *State
 // obtained from Store.Snapshot() is a race and will not persist; the deep-copy
@@ -29,12 +29,19 @@ func ImportJiraTicket(s *State, t tracker.Ticket) {
 		}
 	}
 	// Overwrite tracker-owned fields; preserve local-only (X, Y, Source, AssignedRepoIDs).
+	existing.ID = t.ID
 	existing.Summary = t.Summary
 	existing.Status = t.Status
 	existing.URL = t.URL
+	existing.IssueType = t.IssueType
 	existing.Labels = t.Labels
 	existing.Priority = t.Priority
 	existing.AssigneeID = t.AssigneeID
+	existing.AssigneeEmail = t.AssigneeEmail
+	if !t.UpdatedAt.IsZero() {
+		updatedAt := t.UpdatedAt
+		existing.UpdatedAt = &updatedAt
+	}
 	s.Tickets[t.Key] = existing
 }
 

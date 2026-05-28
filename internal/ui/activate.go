@@ -17,7 +17,6 @@ import (
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/git"
 	"github.com/nkzou/cmux-board/internal/state"
-	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
 // actIDShortRegex validates Crockford-base32 lowercase 8-char act_id_short values.
@@ -177,14 +176,9 @@ func activate(
 	// 3b. Render starter prompt AFTER finalPath is known so {{.WorktreePath}}
 	// expands to the actual on-disk path rather than an empty string.
 	snap, _ := store.Snapshot()
-	var ticketForPrompt tracker.Ticket
+	ticketForPrompt := state.PromptTicket(state.TicketState{Key: ticketID})
 	if ts, ok := snap.Tickets[ticketID]; ok {
-		ticketForPrompt = tracker.Ticket{
-			Key:     ts.Key,
-			Summary: ts.Summary,
-			Status:  ts.Status,
-			URL:     ts.URL,
-		}
+		ticketForPrompt = state.PromptTicket(ts)
 	}
 	promptData := claudecli.PromptData{
 		Ticket:       ticketForPrompt,

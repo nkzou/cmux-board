@@ -16,13 +16,16 @@ type State struct {
 // Source is "jira" for imported tickets and "local" for user-created local tickets.
 type TicketState struct {
 	Key             string     `json:"key"`
-	Source          string     `json:"source"`                 // "jira" | "local"
+	ID              string     `json:"id,omitempty"`
+	Source          string     `json:"source"` // "jira" | "local"
 	Summary         string     `json:"summary,omitempty"`
-	Status          string     `json:"status,omitempty"`        // Jira-mirrored; empty for local tickets
+	Status          string     `json:"status,omitempty"`       // Jira-mirrored; empty for local tickets
 	LocalStatus     string     `json:"local_status,omitempty"` // local tickets only
+	IssueType       string     `json:"issue_type,omitempty"`
 	Priority        string     `json:"priority,omitempty"`
 	AssigneeID      string     `json:"assignee_id,omitempty"`
-	URL             string     `json:"url,omitempty"`           // used by activate.go:186
+	AssigneeEmail   string     `json:"assignee_email,omitempty"`
+	URL             string     `json:"url,omitempty"` // used by activate.go:186
 	Labels          []string   `json:"labels,omitempty"`
 	X               int        `json:"x"`
 	Y               int        `json:"y"`
@@ -34,8 +37,8 @@ type TicketState struct {
 // Fields are journaled incrementally; complete==false means a prior run was interrupted.
 type ActivationEntry struct {
 	// Durable keys
-	ActivationID string `json:"activation_id"`  // full ULID (canonical durable key)
-	ActIDShort   string `json:"act_id_short"`   // first 8 Crockford-base32 chars of ULID, lowercased
+	ActivationID string `json:"activation_id"` // full ULID (canonical durable key)
+	ActIDShort   string `json:"act_id_short"`  // first 8 Crockford-base32 chars of ULID, lowercased
 	RepoID       string `json:"repo_id"`
 	TicketID     string `json:"ticket_id"`
 	ApproachName string `json:"approach_name"` // original (unsanitized) for display
@@ -50,8 +53,8 @@ type ActivationEntry struct {
 	CmuxWorkspaceID string `json:"cmux_workspace_id,omitempty"`
 	AgentPaneRef    string `json:"agent_pane_ref,omitempty"`
 	// Journal step tracking (Codex Finding 5)
-	Step     string `json:"step"`     // "started"|"worktree_created"|"claude_started"|"cmux_created"
-	Complete bool   `json:"complete"` // false until all 3 side effects journaled
+	Step          string     `json:"step"`     // "started"|"worktree_created"|"claude_started"|"cmux_created"
+	Complete      bool       `json:"complete"` // false until all 3 side effects journaled
 	CreatedAt     time.Time  `json:"created_at"`
 	LastFocusedAt *time.Time `json:"last_focused_at,omitempty"`
 	// Orphan flags

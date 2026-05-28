@@ -32,6 +32,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleSpinnerTick(msg)
 	case focusResultMsg:
 		return m.handleFocusResult(msg)
+	case respawnDoneMsg:
+		return m.handleRespawnDone(msg)
 	case toastExpireMsg:
 		return m.expireToasts()
 	default:

@@ -325,8 +325,10 @@ func (m Model) handlePickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Focus()
 	case KeyPickerRespawn:
-		// TODO(T-063): respawn selected activation.
-		return m, nil
+		if len(ps.entries) == 0 {
+			return m, nil
+		}
+		return m.tryRespawnActivation(ps.entries[ps.cursorIdx])
 	case KeyPickerDelete:
 		if len(ps.entries) == 0 {
 			return m, nil

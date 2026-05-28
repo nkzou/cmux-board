@@ -219,14 +219,18 @@ func centeredHint(w, h int, hint string) string {
 }
 
 // cardWidth returns a reasonable default card width based on canvas width.
-// Cards are roughly 1/3 of the canvas width, clamped to sensible bounds.
+// Cards are roughly 70% of the previous 1/3-width layout, clamped to sensible
+// bounds. Narrow cards make side-by-side planning easier; titles wrap vertically.
 func cardWidth(canvasW int) int {
-	w := canvasW / 3
-	if w < 16 {
-		w = 16
+	w := canvasW * 7 / 30
+	if w < 12 {
+		w = 12
 	}
-	if w > 40 {
-		w = 40
+	if w > 28 {
+		w = 28
+	}
+	if canvasW > 0 && w > canvasW {
+		w = canvasW
 	}
 	return w
 }

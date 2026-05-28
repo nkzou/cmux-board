@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nkzou/cmux-board/internal/claudecli"
 	"github.com/nkzou/cmux-board/internal/cmuxcli"
@@ -101,6 +102,50 @@ func runActivateWithStore(t *testing.T, store *state.Store, cfg *config.Config, 
 	return activate(context.Background(), store, cfg, ticketID, repoID, approach, deps)
 }
 
+func TestActivate_StarterPromptIncludesRichJiraContext(t *testing.T) {
+	dir := t.TempDir()
+	store, err := state.Open(filepath.Join(dir, "state.json"))
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	updatedAt := time.Date(2026, 5, 28, 13, 45, 0, 0, time.UTC)
+	if err := store.Mutate(func(s *state.State) error {
+		s.Tickets["PROJ-42"] = state.TicketState{
+			Key:           "PROJ-42",
+			ID:            "10042",
+			Source:        "jira",
+			Summary:       "Fix login",
+			Status:        "In Progress",
+			IssueType:     "Bug",
+			Priority:      "High",
+			AssigneeID:    "acc-42",
+			AssigneeEmail: "dev42@example.com",
+			URL:           "https://jira.example.com/browse/PROJ-42",
+			Labels:        []string{"auth", "backend"},
+			UpdatedAt:     &updatedAt,
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("store.Mutate seed: %v", err)
+	}
+
+	cfg := buildTestConfig(t, "repo1")
+	cfg.Claude.StarterPrompt = `{{.Ticket.ID}}|{{.Ticket.Key}}|{{.Ticket.IssueType}}|{{.Ticket.Priority}}|{{.Ticket.AssigneeEmail}}|{{range .Ticket.Labels}}{{.}},{{end}}|{{.Ticket.UpdatedAt.Format "2006-01-02"}}|{{.Repo.ID}}|{{.ApproachName}}`
+
+	var capturedArgs []claudecli.BGArgs
+	_, err = activate(context.Background(), store, cfg, "PROJ-42", "repo1", "analysis", happyDeps(&capturedArgs))
+	if err != nil {
+		t.Fatalf("activate: %v", err)
+	}
+	if len(capturedArgs) != 1 {
+		t.Fatalf("captured launch calls = %d, want 1", len(capturedArgs))
+	}
+	want := "10042|PROJ-42|Bug|High|dev42@example.com|auth,backend,|2026-05-28|repo1|analysis"
+	if capturedArgs[0].Prompt != want {
+		t.Fatalf("Prompt = %q, want %q", capturedArgs[0].Prompt, want)
+	}
+}
+
 func TestActivate_ActIDShortEncoding(t *testing.T) {
 	entry, err := runActivate(t, "PROJ-1", "repo1", "my-feature", happyDeps(nil))
 	if err != nil {
@@ -121,7 +166,7 @@ func TestActivate_JournalsBeforeFirstSideEffect(t *testing.T) {
 	type panicSentinel struct{}
 
 	func() {
-		defer func() { recover() }() //nolint:errcheck
+		defer func() { recover() }()                                                         //nolint:errcheck
 		activate(context.Background(), store, cfg, "PROJ-1", "repo1", "test2", activateDeps{ //nolint:errcheck
 			createWorktree: func(_, _, _, _ string) error {
 				panic(panicSentinel{})

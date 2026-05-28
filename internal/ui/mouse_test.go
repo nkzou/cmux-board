@@ -6,14 +6,12 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
 
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/state"
 )
 
 // buildMouseModel creates a Model with tickets seeded for mouse tests.
-// The zone manager is initialized by TestMain; zone.Mark is active.
 func buildMouseModel(t *testing.T, tickets map[string]state.TicketState, zOrder []string) Model {
 	t.Helper()
 	store, err := state.Open(filepath.Join(t.TempDir(), "state.json"))
@@ -86,24 +84,58 @@ func TestMouse_PressReleaseSameCell_Activates(t *testing.T) {
 	m.width = 80
 	m.height = 24
 
-	// Render and scan to populate zone registry.
-	raw := m.renderPostitCanvas()
-	scanZone(raw)
-
 	// Synthesize press + release at same cell.
-	press := tea.MouseMsg{X: 2, Y: 1, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft}
+	press := tea.MouseMsg{X: 2, Y: headerRows + 1, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft}
 	after1, _ := m.handleMouseMsg(press)
 	m1 := after1.(Model)
-	// After press, dragging should be set (if the zone hit the card).
-	// If zone is not populated (headless), dragging stays nil → release is a no-op.
 
-	rel := tea.MouseMsg{X: 2, Y: 1, Action: tea.MouseActionRelease, Button: tea.MouseButtonLeft}
+	rel := tea.MouseMsg{X: 2, Y: headerRows + 1, Action: tea.MouseActionRelease, Button: tea.MouseButtonLeft}
 	after2, _ := m1.handleMouseMsg(rel)
 	m2 := after2.(Model)
 
-	// Dragging must be cleared regardless of zone hit.
+	// Dragging must be cleared after click release.
 	if m2.dragging != nil {
 		t.Error("dragging should be nil after release")
+	}
+}
+
+func TestMouse_PressSideBySideSameRowHitsSelectedCard(t *testing.T) {
+	t.Parallel()
+	tickets := map[string]state.TicketState{
+		"A": {Key: "A", Summary: "Left Card", X: 0, Y: 0, Source: "local", LocalStatus: "Open"},
+		"B": {Key: "B", Summary: "Right Card", X: 40, Y: 0, Source: "local", LocalStatus: "Open"},
+	}
+	m := buildMouseModel(t, tickets, []string{"A", "B"})
+	m.width = 100
+	m.height = 24
+
+	for _, tt := range []struct {
+		name   string
+		x      int
+		want   string
+		zOrder []string
+	}{
+		{name: "left under top row", x: 2, want: "A", zOrder: []string{"A", "B"}},
+		{name: "right top row", x: 42, want: "B", zOrder: []string{"A", "B"}},
+		{name: "left still selectable after right promoted", x: 2, want: "A", zOrder: []string{"B", "A"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m.zOrder = tt.zOrder
+			press := tea.MouseMsg{
+				X:      tt.x,
+				Y:      headerRows + 1,
+				Action: tea.MouseActionPress,
+				Button: tea.MouseButtonLeft,
+			}
+			next, _ := m.handleMouseMsg(press)
+			got := next.(Model)
+			if got.dragging == nil {
+				t.Fatalf("dragging is nil; debug=%s", got.dragDebug)
+			}
+			if got.dragging.key != tt.want {
+				t.Fatalf("dragging.key = %q, want %q; debug=%s", got.dragging.key, tt.want, got.dragDebug)
+			}
+		})
 	}
 }
 
@@ -224,14 +256,5 @@ func TestMouse_ReleasePromotesZOrderTop(t *testing.T) {
 	top := m2.zOrder[len(m2.zOrder)-1]
 	if top != "A" {
 		t.Errorf("expected A at top of zOrder after release, got %q", top)
-	}
-}
-
-// scanZone calls zone.Scan if the global manager is initialized.
-// Avoids import of bubblezone in test bodies directly.
-func scanZone(v string) {
-	// zone.DefaultManager is initialized by TestMain; Scan is safe.
-	if v != "" {
-		zone.Scan(v)
 	}
 }
