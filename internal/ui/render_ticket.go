@@ -20,10 +20,39 @@ type renderTicketParams struct {
 	spinnerGlyph string
 }
 
+// statusBorder maps the ticket's effective status to a border color.
+// For local tickets the LocalStatus field is used; for Jira tickets the Status field is used.
+// F6 invariant: border color is purely visual and never affects position.
+func statusBorder(t Ticket, colors uiColors) lipgloss.Color {
+	s := t.Status
+	if t.Source == "local" {
+		s = t.LocalStatus
+	}
+	switch s {
+	case "Open", "To Do":
+		return colors.BorderOpen
+	case "In Progress":
+		return colors.BorderInProgress
+	case "Done":
+		return colors.BorderDone
+	default:
+		return colors.BorderNeutral
+	}
+}
+
 // renderTicket renders a single kanban ticket card.
 // TODO(M-006): add [orphan] glyph when claude_orphan:true
 func renderTicket(p renderTicketParams) string {
 	var headerParts []string
+
+	// Source badge for local tickets.
+	if p.ticket.Source == "local" {
+		localStyle := lipgloss.NewStyle().
+			Foreground(p.colors.subtext).
+			Background(p.colors.overlay).
+			Padding(0, 1)
+		headerParts = append(headerParts, localStyle.Render("(local)"))
+	}
 
 	// Priority badge.
 	if p.ticket.Priority == "highest" || p.ticket.Priority == "high" {
@@ -38,12 +67,17 @@ func renderTicket(p renderTicketParams) string {
 	}
 
 	// Status badge (simple text for now; M-008 wires full status pill).
-	if p.ticket.Status != "" {
+	// Local tickets show LocalStatus; Jira tickets show Status.
+	displayStatus := p.ticket.Status
+	if p.ticket.Source == "local" {
+		displayStatus = p.ticket.LocalStatus
+	}
+	if displayStatus != "" {
 		statusStyle := lipgloss.NewStyle().
 			Foreground(p.colors.base).
 			Background(p.colors.primary).
 			Padding(0, 1)
-		headerParts = append(headerParts, statusStyle.Render(p.ticket.Status))
+		headerParts = append(headerParts, statusStyle.Render(displayStatus))
 	}
 
 	// Worktree badge — present when this ticket already has at least one
@@ -107,7 +141,7 @@ func renderTicket(p renderTicketParams) string {
 	content := strings.Join(lines, "\n")
 
 	border := ticketBorder
-	borderColor := p.colors.surface
+	borderColor := statusBorder(p.ticket, p.colors)
 
 	if p.isHovered && !p.isSelected {
 		borderColor = p.colors.overlay

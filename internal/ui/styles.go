@@ -17,6 +17,12 @@ type uiColors struct {
 	warning   lipgloss.Color
 	err       lipgloss.Color
 	info      lipgloss.Color
+
+	// Status-driven border colors (T-504 / F6).
+	BorderOpen       lipgloss.Color
+	BorderInProgress lipgloss.Color
+	BorderDone       lipgloss.Color
+	BorderNeutral    lipgloss.Color
 }
 
 // defaultColors returns a sensible catppuccin-mocha palette for use before config is wired.
@@ -35,6 +41,11 @@ func defaultColors() uiColors {
 		warning:   lipgloss.Color("#f9e2af"),
 		err:       lipgloss.Color("#f38ba8"),
 		info:      lipgloss.Color("#89dceb"),
+
+		BorderOpen:       lipgloss.Color("#888888"),
+		BorderInProgress: lipgloss.Color("#5fafff"),
+		BorderDone:       lipgloss.Color("#5fd75f"),
+		BorderNeutral:    lipgloss.Color("#313244"),
 	}
 }
 

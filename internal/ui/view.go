@@ -198,6 +198,8 @@ func ticketStateToUI(t state.TicketState, isActivating bool, activationCount int
 		Labels:          t.Labels,
 		Priority:        t.Priority,
 		URL:             t.URL,
+		Source:          t.Source,
+		LocalStatus:     t.LocalStatus,
 		IsActivating:    isActivating,
 		ActivationCount: activationCount,
 	}
