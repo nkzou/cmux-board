@@ -47,7 +47,7 @@ func CheckSchemaVersion(path string) error {
 			"Config schema v1 detected. Run `cmux-board init --migrate` to upgrade — "+
 			"not implemented in v1; hand-edit since you are the only user.\n"+
 			"Specifically: add \"schema_version\": 2 and the new 'repos' field to config.json; "+
-			"add 'assigned_repo_ids' to each ticket in state.json.",
+			"add 'assigned_repo_ids' to each ticket in state.json",
 			ErrSchemaV1, path)
 	}
 	return nil
