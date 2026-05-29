@@ -10,6 +10,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
+	case tea.MouseMsg:
+		return m.handleMouseMsg(msg)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	case PollOKMsg:
@@ -20,8 +22,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePushOK(msg)
 	case PushConflictMsg:
 		return m.handlePushConflict(msg)
-	case pushResultMsg:
-		return m.handlePushResult(msg)
 	case snapshotRefreshMsg:
 		return m.refreshSnapshot()
 	case activationDoneMsg:
@@ -64,23 +64,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.handleRepoPickerMode(msg)
 	case ModeHelp:
 		return m.handleHelpMode(msg)
+	case ModeImportInput:
+		return m.handleImportInputMode(msg)
+	case ModeCreateInput:
+		return m.handleCreateInputMode(msg)
 	default:
 		return m, nil
 	}
 }
 
-// refreshSnapshot re-derives the board from the store.
+// refreshSnapshot re-derives the snapshot from the store.
 // Called after PollOKMsg, snapshotRefreshMsg, and store mutations that need a UI refresh.
 func (m Model) refreshSnapshot() (Model, tea.Cmd) {
 	snap, rev := m.store.Snapshot()
 	m.snapshot = snap
 	m.snapshotRev = rev
-	m.board = snap.Board
-
-	mapped, unmapped := resolveTickets(snap)
-	m.tickets = flattenMapped(m.board, mapped)
-	m.unmappedTickets = unmapped
-
+	// T-403 renderPostitCanvas reads directly from the snapshot; no pre-computed
+	// tickets slice needed here.
 	return m, nil
 }
 

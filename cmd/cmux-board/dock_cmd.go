@@ -10,12 +10,13 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 	"github.com/spf13/cobra"
 
 	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/refresh"
 	"github.com/nkzou/cmux-board/internal/runtime"
 	"github.com/nkzou/cmux-board/internal/state"
-	isync "github.com/nkzou/cmux-board/internal/sync"
 	"github.com/nkzou/cmux-board/internal/tracker"
 	"github.com/nkzou/cmux-board/internal/tracker/jira"
 	"github.com/nkzou/cmux-board/internal/ui"
@@ -33,6 +34,8 @@ func init() {
 		"bypass credentials.json mode-bit check (for development only)")
 	dockCmd.Flags().String("log-level", "info",
 		"log level: debug, info, warn, error")
+	dockCmd.Flags().Bool("debug", false,
+		"show mouse-event counters and last-drag diagnostic in the status bar")
 	rootCmd.AddCommand(dockCmd)
 }
 
@@ -57,8 +60,11 @@ type dockDeps struct {
 	newTracker func(cfg config.Config, creds config.Credentials) tracker.IssueTracker
 	// runProgram runs the BubbleTea program and returns when the user quits.
 	// resultCh, when non-nil, is drained and forwarded to the program via Send.
-	// Production passes bridge.ResultCh; tests pass nil (no-op).
-	runProgram func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error
+	// tr, when non-nil, is threaded into the Model so import-from-Jira can call GetTicket.
+	// debug, when true, surfaces mouse-event counters and the last-drag diagnostic
+	// in the status bar so terminal mouse pass-through can be inspected.
+	// Production passes bridge.ResultCh + the live tracker; tests pass nil.
+	runProgram func(ctx context.Context, cfg *config.Config, store *state.Store, tr tracker.IssueTracker, resultCh <-chan tea.Msg, debug bool) error
 	// logWriter is the underlying writer for the logger (nil = os.Stderr).
 	logWriter io.Writer
 }
@@ -100,9 +106,14 @@ func prodDockDeps() dockDeps {
 				Columns: trackerCols,
 			})
 		},
-		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, resultCh <-chan tea.Msg) error {
-			model := ui.NewModelWithContext(ctx, cfg, store)
-			prog := tea.NewProgram(model, tea.WithAltScreen(), tea.WithOutput(os.Stderr))
+		runProgram: func(ctx context.Context, cfg *config.Config, store *state.Store, tr tracker.IssueTracker, resultCh <-chan tea.Msg, debug bool) error {
+			model := ui.NewModelWithTracker(ctx, cfg, store, tr)
+			model = model.WithDebug(debug)
+			prog := tea.NewProgram(model,
+				tea.WithAltScreen(),
+				tea.WithOutput(os.Stderr),
+				tea.WithMouseCellMotion(),
+			)
 			// Drain bridge.ResultCh and forward each message to the program.
 			if resultCh != nil {
 				go func() {
@@ -138,6 +149,7 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 
 	unsafeCreds, _ := cmd.Flags().GetBool("unsafe-creds")
 	logLevelStr, _ := cmd.Flags().GetString("log-level")
+	debug, _ := cmd.Flags().GetBool("debug")
 
 	// Resolve config directory and paths.
 	configDir, err := resolveRootConfigDir()
@@ -204,18 +216,33 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 	// Construct the tracker adapter.
 	tr := deps.newTracker(cfg, creds)
 
-	// Step 8: Create bridge and start sync.Poller + push worker.
-	// bridge.ResultCh is drained inside runProgram via prog.Send.
-	bridge := isync.NewBridge()
-	poller := isync.NewPoller(ctx, &cfg, tr, store, bridge.EmitFn())
-	go bridge.RunPushWorker(ctx, store, tr)
+	// Step 8: Start refresher (read-only ticker; no push worker).
+	// zone.NewGlobal initializes the bubblezone manager for mouse hit-testing.
+	zone.NewGlobal()
+	defer zone.Close()
 
-	// Shutdown coordinator.
-	coord := runtime.NewCoordinator(cancel, poller, store, slog.Default())
+	refreshCfg := refresh.Config{
+		Interval: time.Duration(cfg.PollIntervalSeconds) * time.Second,
+	}
+
+	// emitCh buffers messages from the refresher and is drained by runProgram via prog.Send.
+	// Capacity 32 matches the old bridge channel capacity.
+	emitCh := make(chan tea.Msg, 32)
+	emitFn := func(msg tea.Msg) {
+		select {
+		case emitCh <- msg:
+		default:
+		}
+	}
+	refresher := refresh.NewRefresher(ctx, refreshCfg, tr, store, emitFn)
+
+	// Shutdown coordinator drains the refresher on context cancellation.
+	// *refresh.Refresher satisfies runtime.Drainable via its no-arg Wait() method.
+	coord := runtime.NewCoordinator(cancel, refresher, store, slog.Default())
 
 	// Step 9: Run BubbleTea program (blocks until user presses q).
-	// bridge.ResultCh draining is handled inside runProgram via prog.Send.
-	if err := deps.runProgram(ctx, &cfg, store, bridge.ResultCh); err != nil {
+	// emitCh is drained inside runProgram via prog.Send.
+	if err := deps.runProgram(ctx, &cfg, store, tr, emitCh, debug); err != nil {
 		slog.Error("bubbletea program exited with error", "err", err)
 	}
 

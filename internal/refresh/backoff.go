@@ -1,4 +1,4 @@
-package sync
+package refresh
 
 import "time"
 

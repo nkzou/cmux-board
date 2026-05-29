@@ -29,6 +29,9 @@ func (m *columnsMockAdapter) GetBoard(ctx context.Context, boardID string) (trac
 func (m *columnsMockAdapter) ListTickets(ctx context.Context, boardID string, since *time.Time) ([]tracker.Ticket, error) {
 	return m.tickets, m.ticketErr
 }
+func (m *columnsMockAdapter) GetTicket(_ context.Context, _ string) (tracker.Ticket, error) {
+	return tracker.Ticket{}, errors.New("not implemented")
+}
 func (m *columnsMockAdapter) TransitionStatus(ctx context.Context, ticketID, expectedFromStatus, toStatus string) error {
 	return errors.New("not implemented")
 }

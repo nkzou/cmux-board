@@ -1,4 +1,4 @@
-package sync
+package refresh
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 
 // TestBackoffSequence verifies the three-step sequence 60s → 2m → 5m.
 func TestBackoffSequence(t *testing.T) {
+	t.Parallel()
 	// TC-1: first three calls return 60s / 2m / 5m.
 	var b Backoff
 	want := []time.Duration{60 * time.Second, 2 * time.Minute, 5 * time.Minute}
@@ -20,6 +21,7 @@ func TestBackoffSequence(t *testing.T) {
 
 // TestBackoffCapMaintained verifies that calls beyond the third still return 5m.
 func TestBackoffCapMaintained(t *testing.T) {
+	t.Parallel()
 	// TC-2: six consecutive calls; last three must all equal 5m.
 	var b Backoff
 	var results [6]time.Duration
@@ -35,6 +37,7 @@ func TestBackoffCapMaintained(t *testing.T) {
 
 // TestBackoffReset verifies that Reset() restarts the sequence from 60s.
 func TestBackoffReset(t *testing.T) {
+	t.Parallel()
 	// TC-3: advance to cap, reset, first call must return 60s.
 	var b Backoff
 	b.Next()
@@ -49,6 +52,7 @@ func TestBackoffReset(t *testing.T) {
 
 // TestBackoffZeroValue verifies zero-value Backoff is safe to use.
 func TestBackoffZeroValue(t *testing.T) {
+	t.Parallel()
 	// TC-4: declare zero value, first call must return 60s.
 	var b Backoff
 	got := b.Next()

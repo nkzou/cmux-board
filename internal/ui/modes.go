@@ -13,4 +13,6 @@ const (
 	ModeFilter                // ticket filter input active
 	ModeShuttingDown          // terminal clean-up in progress
 	ModeRepoPicker            // repo picker overlay (first-touch or multi-repo disambiguation)
+	ModeImportInput           // text input for importing a Jira ticket by key (T-502)
+	ModeCreateInput           // text input for creating a local ticket (T-503)
 )

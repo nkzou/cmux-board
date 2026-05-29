@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"math"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/nkzou/cmux-board/internal/state"
@@ -24,6 +26,14 @@ const (
 	KeyHelp        = "?"
 	KeyQuit        = "q"
 
+	// Post-it board keybinds (T-501).
+	KeyImportJira   = "i"
+	KeyCreateLocal  = "c"
+	KeyRemoveTicket = "x"
+	KeyCycleStatus  = "s"
+	KeyZCycleNext   = "tab"
+	KeyZCyclePrev   = "shift+tab"
+
 	// Picker mode
 	KeyPickerFocus   = "enter"
 	KeyPickerNew     = "n" // lowercase n — new approach from picker
@@ -46,91 +56,117 @@ const (
 
 // handleNormalMode handles key events when mode == ModeNormal.
 func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
+	snap := m.snapshot
+	// Reconcile zOrder + selection against the current snapshot before dispatching.
+	// View() reconciles on a value-copy that never reaches Update, so on the first
+	// keypress selectedKey is "" and remove/cycle/arrows short-circuit. Reconciling
+	// here ensures every keybind sees an up-to-date selection.
+	if snap != nil {
+		m.reconcileZOrder(snap)
+	}
+	if snap == nil || len(snap.Tickets) == 0 {
+		// No tickets — only mode-switching and quit are meaningful.
+		switch msg.String() {
+		case KeyHelp:
+			m.mode = ModeHelp
+		case KeyQuit:
+			m.mode = ModeShuttingDown
+			return m, tea.Quit
+		case KeyFilter:
+			m.mode = ModeFilter
+			m.filterInput.Focus()
+		case KeyImportJira:
+			m.mode = ModeImportInput
+			m.importInput.SetValue("")
+			m.importInput.Focus()
+		case KeyCreateLocal:
+			m.mode = ModeCreateInput
+			m.createInput.SetValue("")
+			m.createInput.Focus()
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
 	case KeyLeft, "left":
-		if m.activeColIdx > 0 {
-			m.activeColIdx--
-			m.activeTicketIdx = 0
+		if next := nearestWest(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
 		}
 	case KeyRight, "right":
-		colCount := len(m.board.Columns)
-		if m.activeColIdx < colCount-1 {
-			m.activeColIdx++
-			m.activeTicketIdx = 0
+		if next := nearestEast(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
 		}
 	case KeyDown, "down":
-		colTickets := m.ticketsForActiveCol()
-		if m.activeTicketIdx < len(colTickets)-1 {
-			m.activeTicketIdx++
+		if next := nearestSouth(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
 		}
 	case KeyUp, "up":
-		if m.activeTicketIdx > 0 {
-			m.activeTicketIdx--
+		if next := nearestNorth(snap, m.selectedKey); next != "" {
+			m.selectedKey = next
 		}
+	case KeyZCycleNext:
+		m.selectedKey = zCycleNext(m.zOrder, m.selectedKey)
+	case KeyZCyclePrev:
+		m.selectedKey = zCyclePrev(m.zOrder, m.selectedKey)
 	case KeyActivate:
-		// Determine current ticket.
-		colTickets := m.ticketsForActiveCol()
-		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+		if m.selectedKey == "" {
 			return m, nil
 		}
-		ticketID := colTickets[m.activeTicketIdx].Key
-		var res RepoResolution
-		m, res = resolveRepoAndRoute(m, ticketID)
-		if res.Cancelled || res.PickerOpened {
-			// Cancelled → toast was pushed; PickerOpened → ModeRepoPicker is now active.
-			return m, nil
-		}
-		// Exactly 1 repo assigned: check for existing activations.
-		repoID := res.RepoID
-		ps := newPickerState(m.snapshot, ticketID, repoID)
-		if ps == nil {
-			activations := state.FindActivations(m.snapshot, ticketID, repoID)
-			if len(activations) == 0 {
-				// 0 activations → activate with empty approach name.
-				return m.tryActivate(ticketID, repoID, "")
-			}
-			// 1 activation → focus directly (T-063).
-			return m.focusActivation(activations[0])
-		}
-		// 2+ activations → open activation picker.
-		m.pickerState = ps
-		m.mode = ModePicker
-		return m, nil
+		return m.tryActivate(m.selectedKey)
 	case KeyNewApproach:
 		// Capital N: new approach regardless of existing activations (F16).
-		// MUST NOT check len(activations) before entering ModeApproachName.
 		m.previousMode = ModeNormal
 		m.mode = ModeApproachName
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Focus()
 	case KeyManage:
-		colTickets := m.ticketsForActiveCol()
-		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+		if m.selectedKey == "" {
 			return m, nil
 		}
-		ticketID := colTickets[m.activeTicketIdx].Key
-		assignedIDs := state.AssignedRepoIDs(m.snapshot, ticketID)
-		switch len(assignedIDs) {
-		case 0:
-			return m.pushToast("no repos assigned — press a to assign")
-		case 1:
-			m.pickerState = forcePickerState(m.snapshot, ticketID, assignedIDs[0])
-			m.mode = ModePicker
-		default:
-			// Multi-repo: let user pick which repo's activations to manage.
-			m.repoPicker = newRepoPickerState(m.cfg, ticketID, assignedIDs, false)
-			m.repoPicker.manageIntent = true
-			m.mode = ModeRepoPicker
-		}
-		return m, nil
+		return m.openManageActivations(m.selectedKey)
 	case KeyAssignRepos:
-		colTickets := m.ticketsForActiveCol()
-		if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+		if m.selectedKey == "" {
 			return m, nil
 		}
-		ticketID := colTickets[m.activeTicketIdx].Key
-		m.assignmentEditor = newAssignmentEditorState(m.cfg, m.snapshot, ticketID)
+		m.assignmentEditor = newAssignmentEditorState(m.cfg, m.snapshot, m.selectedKey)
 		m.mode = ModeAssignmentEditor
+		return m, nil
+	case KeyImportJira:
+		m.mode = ModeImportInput
+		m.importInput.SetValue("")
+		m.importInput.Focus()
+	case KeyCreateLocal:
+		m.mode = ModeCreateInput
+		m.createInput.SetValue("")
+		m.createInput.Focus()
+	case KeyRemoveTicket:
+		if m.selectedKey == "" {
+			return m, nil
+		}
+		key := m.selectedKey
+		if err := m.store.Mutate(func(s *state.State) error {
+			state.RemoveTicket(s, key)
+			return nil
+		}); err != nil {
+			return m.pushToast("remove failed: " + err.Error())
+		}
+		snap2, rev := m.store.Snapshot()
+		m.snapshot = snap2
+		m.snapshotRev = rev
+	case KeyCycleStatus:
+		if m.selectedKey == "" {
+			return m, nil
+		}
+		key := m.selectedKey
+		if err := m.store.Mutate(func(s *state.State) error {
+			state.CycleStatus(s, key)
+			return nil
+		}); err != nil {
+			return m.pushToast("cycle status failed: " + err.Error())
+		}
+		snap2, rev := m.store.Snapshot()
+		m.snapshot = snap2
+		m.snapshotRev = rev
 	case KeyFilter:
 		m.mode = ModeFilter
 		m.filterInput.Focus()
@@ -141,6 +177,130 @@ func (m Model) handleNormalMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+// nearestEast returns the key of the nearest ticket strictly to the east of fromKey.
+// East means t.X > from.X; ties broken by smallest dx then smallest |dy|.
+// Returns "" if no ticket qualifies.
+func nearestEast(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDx, bestDy := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.X <= from.X {
+			continue
+		}
+		dx := t.X - from.X
+		dy := abs(t.Y - from.Y)
+		if dx < bestDx || (dx == bestDx && dy < bestDy) {
+			best, bestDx, bestDy = k, dx, dy
+		}
+	}
+	return best
+}
+
+// nearestWest returns the key of the nearest ticket strictly to the west of fromKey.
+func nearestWest(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDx, bestDy := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.X >= from.X {
+			continue
+		}
+		dx := from.X - t.X
+		dy := abs(t.Y - from.Y)
+		if dx < bestDx || (dx == bestDx && dy < bestDy) {
+			best, bestDx, bestDy = k, dx, dy
+		}
+	}
+	return best
+}
+
+// nearestSouth returns the key of the nearest ticket strictly to the south (higher Y).
+func nearestSouth(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDy, bestDx := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.Y <= from.Y {
+			continue
+		}
+		dy := t.Y - from.Y
+		dx := abs(t.X - from.X)
+		if dy < bestDy || (dy == bestDy && dx < bestDx) {
+			best, bestDy, bestDx = k, dy, dx
+		}
+	}
+	return best
+}
+
+// nearestNorth returns the key of the nearest ticket strictly to the north (lower Y).
+func nearestNorth(snap *state.State, fromKey string) string {
+	from, ok := snap.Tickets[fromKey]
+	if !ok {
+		return ""
+	}
+	best := ""
+	bestDy, bestDx := math.MaxInt, math.MaxInt
+	for k, t := range snap.Tickets {
+		if k == fromKey || t.Y >= from.Y {
+			continue
+		}
+		dy := from.Y - t.Y
+		dx := abs(t.X - from.X)
+		if dy < bestDy || (dy == bestDy && dx < bestDx) {
+			best, bestDy, bestDx = k, dy, dx
+		}
+	}
+	return best
+}
+
+// zCycleNext advances selectedKey to the next entry in zOrder (wraps around).
+// Returns selectedKey unchanged if it is not in zOrder or zOrder is empty.
+func zCycleNext(zOrder []string, selectedKey string) string {
+	if len(zOrder) == 0 {
+		return selectedKey
+	}
+	for i, k := range zOrder {
+		if k == selectedKey {
+			return zOrder[(i+1)%len(zOrder)]
+		}
+	}
+	// Not found: select first.
+	return zOrder[0]
+}
+
+// zCyclePrev retreats selectedKey to the previous entry in zOrder (wraps around).
+// Returns selectedKey unchanged if it is not in zOrder or zOrder is empty.
+func zCyclePrev(zOrder []string, selectedKey string) string {
+	if len(zOrder) == 0 {
+		return selectedKey
+	}
+	for i, k := range zOrder {
+		if k == selectedKey {
+			return zOrder[(i-1+len(zOrder))%len(zOrder)]
+		}
+	}
+	// Not found: select last.
+	return zOrder[len(zOrder)-1]
+}
+
+// abs returns the absolute value of x.
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // handlePickerMode handles key events when mode == ModePicker.
@@ -160,7 +320,6 @@ func (m Model) handlePickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.mode = ModeNormal
 		return m.focusActivation(entry)
 	case KeyPickerNew:
-		m.pickerState = nil
 		m.previousMode = ModePicker
 		m.mode = ModeApproachName
 		m.approachNameInput.SetValue("")
@@ -221,27 +380,35 @@ func (m Model) handleApproachNameMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Blur()
 		m.mode = ModeNormal
-		// Determine (ticketID, repoID) from context we came from.
+		// Determine (ticketID, repoID) from context.
 		var ticketID, repoID string
 		if m.previousMode == ModePicker && m.pickerState != nil {
 			ticketID = m.pickerState.ticketID
 			repoID = m.pickerState.repoID
 			m.pickerState = nil
 		} else {
-			colTickets := m.ticketsForActiveCol()
-			if len(colTickets) == 0 || m.activeTicketIdx >= len(colTickets) {
+			ticketID = m.selectedKey
+			if ticketID == "" {
+				m.previousMode = ModeNormal
 				return m, nil
 			}
-			ticketID = colTickets[m.activeTicketIdx].Key
 			var res RepoResolution
 			m, res = resolveRepoAndRoute(m, ticketID)
-			if res.Cancelled || res.PickerOpened {
+			if res.Cancelled {
+				m.previousMode = ModeNormal
+				return m, nil
+			}
+			if res.PickerOpened {
+				if m.repoPicker != nil {
+					m.repoPicker.pendingApproach = name
+				}
+				m.previousMode = ModeNormal
 				return m, nil
 			}
 			repoID = res.RepoID
 		}
 		m.previousMode = ModeNormal
-		return m.tryActivate(ticketID, repoID, name)
+		return m.tryActivateWithRepo(ticketID, repoID, name)
 	case KeyApproachCancel:
 		m.approachNameInput.SetValue("")
 		m.approachNameInput.Blur()
@@ -326,6 +493,7 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 		ticketID := rp.ticketID
 		firstTouch := rp.firstTouch
 		manageIntent := rp.manageIntent
+		pendingApproach := rp.pendingApproach
 		chosenID := row.repoID
 		m.repoPicker = nil
 		m.mode = ModeNormal
@@ -349,12 +517,16 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if pendingApproach != "" {
+			return m.tryActivateWithRepo(ticketID, chosenID, pendingApproach)
+		}
+
 		// Normal activation flow: check activations for (ticketID, chosenID).
 		ps := newPickerState(m.snapshot, ticketID, chosenID)
 		if ps == nil {
 			activations := state.FindActivations(m.snapshot, ticketID, chosenID)
 			if len(activations) == 0 {
-				return m.tryActivate(ticketID, chosenID, "")
+				return m.tryActivateWithRepo(ticketID, chosenID, "")
 			}
 			// 1 activation → focus directly (T-063).
 			return m.focusActivation(activations[0])
@@ -384,22 +556,4 @@ func (m Model) handleRepoPickerMode(msg tea.KeyMsg) (Model, tea.Cmd) {
 func (m Model) handleHelpMode(_ tea.KeyMsg) (Model, tea.Cmd) {
 	m.mode = ModeNormal
 	return m, nil
-}
-
-// ticketsForActiveCol returns the tickets in the currently active column.
-// Returns nil if the board has no columns or activeColIdx is out of range.
-func (m Model) ticketsForActiveCol() []state.TicketState {
-	if len(m.board.Columns) == 0 || m.activeColIdx >= len(m.board.Columns) {
-		return nil
-	}
-	return m.ticketsInCol(m.board.Columns[m.activeColIdx].ID)
-}
-
-// ticketsInCol returns tickets mapped to colID from the snapshot.
-func (m Model) ticketsInCol(colID string) []state.TicketState {
-	if m.snapshot == nil {
-		return nil
-	}
-	mapped, _ := resolveTickets(m.snapshot)
-	return mapped[colID]
 }

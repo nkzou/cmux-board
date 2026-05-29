@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	isync "github.com/nkzou/cmux-board/internal/sync"
 	"github.com/nkzou/cmux-board/internal/state"
 )
 
@@ -25,10 +24,11 @@ import (
 
 const shutdownDrainTimeout = 5 * time.Second
 
-// pollerWaiter is the interface the Coordinator uses to drain the poller.
-// Using an interface here enables test injection without a real *isync.Poller.
-type pollerWaiter interface {
-	Wait(timeout time.Duration) bool
+// Drainable is satisfied by any background loop that exits on ctx.Done()
+// and blocks Wait() until that exit. *refresh.Refresher implements this.
+// Defined here (the consumer package) per CONVENTIONS § API: accept interfaces.
+type Drainable interface {
+	Wait()
 }
 
 // storeFlushable is the interface the Coordinator uses to flush state.
@@ -39,7 +39,7 @@ type storeFlushable interface {
 // Coordinator manages graceful shutdown of the cmux-board process.
 type Coordinator struct {
 	cancel       context.CancelFunc
-	poller       pollerWaiter
+	poller       Drainable
 	store        storeFlushable
 	logger       *slog.Logger
 	exitFn       func(int)     // defaults to os.Exit; overridden in tests
@@ -47,7 +47,8 @@ type Coordinator struct {
 }
 
 // NewCoordinator creates a Coordinator. Call Run() to install signal handlers.
-func NewCoordinator(cancel context.CancelFunc, poller *isync.Poller, store *state.Store, logger *slog.Logger) *Coordinator {
+// The poller parameter is any Drainable — typically *refresh.Refresher.
+func NewCoordinator(cancel context.CancelFunc, poller Drainable, store *state.Store, logger *slog.Logger) *Coordinator {
 	return &Coordinator{
 		cancel:       cancel,
 		poller:       poller,
@@ -59,7 +60,7 @@ func NewCoordinator(cancel context.CancelFunc, poller *isync.Poller, store *stat
 }
 
 // newCoordinatorFromInterfaces constructs a Coordinator from interfaces for testing.
-func newCoordinatorFromInterfaces(cancel context.CancelFunc, poller pollerWaiter, store storeFlushable, logger *slog.Logger, exitFn func(int)) *Coordinator {
+func newCoordinatorFromInterfaces(cancel context.CancelFunc, poller Drainable, store storeFlushable, logger *slog.Logger, exitFn func(int)) *Coordinator {
 	return &Coordinator{
 		cancel:       cancel,
 		poller:       poller,
@@ -114,8 +115,20 @@ func (c *Coordinator) Run(ctx context.Context) {
 		}
 	}()
 
-	// Step 3: drain poller.
-	if ok := c.poller.Wait(c.drainTimeout); !ok {
+	// Step 3: drain poller with timeout.
+	// Drainable.Wait() blocks until the goroutine exits; we race it against
+	// drainTimeout so a stuck refresher does not block shutdown indefinitely.
+	drained := make(chan struct{})
+	go func() {
+		c.poller.Wait()
+		close(drained)
+	}()
+	drainTimer := time.NewTimer(c.drainTimeout)
+	defer drainTimer.Stop()
+	select {
+	case <-drained:
+		// clean exit
+	case <-drainTimer.C:
 		c.logger.Warn("shutdown: poller drain timeout; continuing")
 	}
 

@@ -64,8 +64,8 @@ func TestFinalize_HappyPath(t *testing.T) {
 	if err := json.Unmarshal(stateData, &st); err != nil {
 		t.Fatalf("state.json parse error: %v", err)
 	}
-	if st.SchemaVersion != 2 {
-		t.Errorf("state schema_version: want 2, got %d", st.SchemaVersion)
+	if st.SchemaVersion != state.SchemaVersionCurrent {
+		t.Errorf("state schema_version: want %d, got %d", state.SchemaVersionCurrent, st.SchemaVersion)
 	}
 	if len(st.Tickets) != 0 {
 		t.Errorf("expected empty tickets, got %d", len(st.Tickets))

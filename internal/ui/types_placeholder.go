@@ -8,6 +8,10 @@ type Ticket struct {
 	Labels               []string
 	Priority             string
 	URL                  string
+	// Source distinguishes "jira" tickets from "local" ones (T-504).
+	Source string
+	// LocalStatus is the status for local-only tickets (T-504).
+	LocalStatus string
 	// IsActivating is true while an Activate goroutine is in flight for this
 	// ticket. Drives the spinner badge in renderTicket and blocks new
 	// activation attempts via tryActivate.

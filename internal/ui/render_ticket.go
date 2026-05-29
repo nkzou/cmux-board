@@ -12,6 +12,7 @@ type renderTicketParams struct {
 	ticket      Ticket
 	isSelected  bool
 	isHovered   bool
+	filteredOut bool
 	width       int
 	accentColor lipgloss.Color
 	colors      uiColors
@@ -20,10 +21,44 @@ type renderTicketParams struct {
 	spinnerGlyph string
 }
 
+// statusBorder maps the ticket's effective status to a border color.
+// For local tickets the LocalStatus field is used; for Jira tickets the Status field is used.
+// F6 invariant: border color is purely visual and never affects position.
+func statusBorder(t Ticket, colors uiColors) lipgloss.Color {
+	s := t.Status
+	if t.Source == "local" {
+		s = t.LocalStatus
+	}
+	switch s {
+	case "Open", "To Do":
+		return colors.BorderOpen
+	case "In Progress":
+		return colors.BorderInProgress
+	case "Done":
+		return colors.BorderDone
+	default:
+		return colors.BorderNeutral
+	}
+}
+
 // renderTicket renders a single kanban ticket card.
 // TODO(M-006): add [orphan] glyph when claude_orphan:true
 func renderTicket(p renderTicketParams) string {
+	if p.filteredOut {
+		p.colors = dimmedColors(p.colors)
+		p.accentColor = p.colors.muted
+	}
+
 	var headerParts []string
+
+	// Source badge for local tickets.
+	if p.ticket.Source == "local" {
+		localStyle := lipgloss.NewStyle().
+			Foreground(p.colors.subtext).
+			Background(p.colors.overlay).
+			Padding(0, 1)
+		headerParts = append(headerParts, localStyle.Render("(local)"))
+	}
 
 	// Priority badge.
 	if p.ticket.Priority == "highest" || p.ticket.Priority == "high" {
@@ -38,12 +73,17 @@ func renderTicket(p renderTicketParams) string {
 	}
 
 	// Status badge (simple text for now; M-008 wires full status pill).
-	if p.ticket.Status != "" {
+	// Local tickets show LocalStatus; Jira tickets show Status.
+	displayStatus := p.ticket.Status
+	if p.ticket.Source == "local" {
+		displayStatus = p.ticket.LocalStatus
+	}
+	if displayStatus != "" {
 		statusStyle := lipgloss.NewStyle().
 			Foreground(p.colors.base).
 			Background(p.colors.primary).
 			Padding(0, 1)
-		headerParts = append(headerParts, statusStyle.Render(p.ticket.Status))
+		headerParts = append(headerParts, statusStyle.Render(displayStatus))
 	}
 
 	// Worktree badge — present when this ticket already has at least one
@@ -107,7 +147,7 @@ func renderTicket(p renderTicketParams) string {
 	content := strings.Join(lines, "\n")
 
 	border := ticketBorder
-	borderColor := p.colors.surface
+	borderColor := statusBorder(p.ticket, p.colors)
 
 	if p.isHovered && !p.isSelected {
 		borderColor = p.colors.overlay
@@ -122,8 +162,29 @@ func renderTicket(p renderTicketParams) string {
 		Border(border).
 		BorderForeground(borderColor).
 		Padding(0, 1).
-		MarginBottom(1).
 		Width(p.width)
+	if p.filteredOut {
+		cardStyle = cardStyle.Faint(true)
+	}
+	// No MarginBottom — a trailing empty row inside zone.Mark would extend the
+	// drag hit zone past the visible card, breaking the "what I see is what I
+	// can click" expectation on a freeform 2D board.
 
 	return cardStyle.Render(content)
+}
+
+func dimmedColors(colors uiColors) uiColors {
+	colors.text = colors.muted
+	colors.subtext = colors.muted
+	colors.primary = colors.overlay
+	colors.secondary = colors.muted
+	colors.success = colors.muted
+	colors.warning = colors.muted
+	colors.err = colors.muted
+	colors.info = colors.muted
+	colors.BorderOpen = colors.muted
+	colors.BorderInProgress = colors.muted
+	colors.BorderDone = colors.muted
+	colors.BorderNeutral = colors.muted
+	return colors
 }

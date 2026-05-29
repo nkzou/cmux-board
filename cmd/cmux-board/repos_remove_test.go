@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/state"
@@ -138,15 +137,14 @@ func TestReposRemoveCmd_RefusedActivation(t *testing.T) {
 	}
 }
 
-func TestReposRemoveCmd_RemovedAtTicket(t *testing.T) {
+func TestReposRemoveCmd_AssignedTicket(t *testing.T) {
 	configDir := setupTempConfigDir(t)
 	writeConfigWithRepos(t, configDir, map[string]config.RepoEntry{
 		"bar": {Name: "Bar"},
 	})
-	removedAt := time.Now()
 	writeStateWithTickets(t, configDir,
 		map[string]state.TicketState{
-			"PROJ-99": {Key: "PROJ-99", AssignedRepoIDs: []string{"bar"}, RemovedAt: &removedAt},
+			"PROJ-99": {Key: "PROJ-99", Source: "jira", AssignedRepoIDs: []string{"bar"}},
 		},
 		nil,
 	)
@@ -154,7 +152,7 @@ func TestReposRemoveCmd_RemovedAtTicket(t *testing.T) {
 	cmd := newReposRemoveCmd()
 	err := cmd.RunE(cmd, []string{"bar"})
 	if !errors.Is(err, config.ErrRepoReferenced) {
-		t.Errorf("expected ErrRepoReferenced for removed_at ticket, got %v", err)
+		t.Errorf("expected ErrRepoReferenced for assigned ticket, got %v", err)
 	}
 	if err != nil && !strings.Contains(err.Error(), "PROJ-99") {
 		t.Errorf("error should mention PROJ-99, got: %v", err)

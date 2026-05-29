@@ -28,6 +28,10 @@ func (s *stubAdapter) ListTickets(_ context.Context, _ string, _ *time.Time) ([]
 	return nil, nil
 }
 
+func (s *stubAdapter) GetTicket(_ context.Context, _ string) (tracker.Ticket, error) {
+	return tracker.Ticket{}, nil
+}
+
 func (s *stubAdapter) TransitionStatus(_ context.Context, _, _, _ string) error {
 	return nil
 }

@@ -27,7 +27,7 @@ func newGuardTestModel(t *testing.T) Model {
 func TestTryActivate_FirstCallMarksTicketActivating(t *testing.T) {
 	m := newGuardTestModel(t)
 
-	m, cmd := m.tryActivate("PROJ-1", "my-repo", "")
+	m, cmd := m.tryActivateWithRepo("PROJ-1", "my-repo", "")
 	if cmd == nil {
 		t.Fatal("first tryActivate returned nil cmd; expected ActivateCmd batch")
 	}
@@ -38,10 +38,10 @@ func TestTryActivate_FirstCallMarksTicketActivating(t *testing.T) {
 
 func TestTryActivate_SecondCallBlockedWithToast(t *testing.T) {
 	m := newGuardTestModel(t)
-	m, _ = m.tryActivate("PROJ-1", "my-repo", "")
+	m, _ = m.tryActivateWithRepo("PROJ-1", "my-repo", "")
 
 	// Second activation attempt for the same ticket while the first is in flight.
-	mAfter, cmd := m.tryActivate("PROJ-1", "my-repo", "approach-2")
+	mAfter, cmd := m.tryActivateWithRepo("PROJ-1", "my-repo", "approach-2")
 	if cmd == nil {
 		t.Fatal("blocked tryActivate should return a toast tea.Cmd, got nil")
 	}
@@ -58,7 +58,7 @@ func TestTryActivate_SecondCallBlockedWithToast(t *testing.T) {
 
 func TestHandleActivationDone_ClearsTicketAndStopsSpinner(t *testing.T) {
 	m := newGuardTestModel(t)
-	m, _ = m.tryActivate("PROJ-1", "my-repo", "")
+	m, _ = m.tryActivateWithRepo("PROJ-1", "my-repo", "")
 	if !m.activatingTickets["PROJ-1"] {
 		t.Fatal("precondition failed: PROJ-1 not marked activating")
 	}
@@ -81,7 +81,7 @@ func TestHandleActivationDone_ClearsOnErrorToo(t *testing.T) {
 	// A failed activation must still release the ticket — otherwise a single
 	// transient error would permanently lock the ticket out of activation.
 	m := newGuardTestModel(t)
-	m, _ = m.tryActivate("PROJ-1", "my-repo", "")
+	m, _ = m.tryActivateWithRepo("PROJ-1", "my-repo", "")
 
 	mAfter, _ := m.handleActivationDone(activationDoneMsg{
 		TicketID: "PROJ-1",
@@ -107,7 +107,7 @@ func TestSpinnerTick_StopsWhenSetEmpty(t *testing.T) {
 
 func TestSpinnerTick_AdvancesAndReArmsWhileActivating(t *testing.T) {
 	m := newGuardTestModel(t)
-	m, _ = m.tryActivate("PROJ-1", "my-repo", "")
+	m, _ = m.tryActivateWithRepo("PROJ-1", "my-repo", "")
 
 	mAfter, cmd := m.handleSpinnerTick(spinnerTickMsg{})
 	if cmd == nil {
@@ -132,7 +132,7 @@ func TestSpinnerGlyph_NonEmpty(t *testing.T) {
 // entry and the worktree badge would be missing until the next poll.
 func TestHandleActivationDone_RefreshesSnapshot(t *testing.T) {
 	m := newGuardTestModel(t)
-	m, _ = m.tryActivate("PROJ-1", "my-repo", "")
+	m, _ = m.tryActivateWithRepo("PROJ-1", "my-repo", "")
 
 	// Simulate the Activate goroutine journaling a new entry into the store
 	// while the Model's snapshot still points at the pre-activation state.
