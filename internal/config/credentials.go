@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/nkzou/cmux-board/internal/atomicfile"
 	"github.com/nkzou/cmux-board/internal/secretsink"
 )
 
@@ -46,5 +47,5 @@ func SaveCredentials(path string, creds Credentials) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal credentials: %w", err)
 	}
-	return WriteFileAtomic(path, data, 0600)
+	return atomicfile.WriteFile(path, data, 0600)
 }

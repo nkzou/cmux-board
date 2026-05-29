@@ -1,4 +1,4 @@
-package config
+package atomicfile
 
 import (
 	"errors"
@@ -8,13 +8,13 @@ import (
 	"testing"
 )
 
-func TestWriteFileAtomicRoundTrip(t *testing.T) {
+func TestWriteFileRoundTrip(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.json")
 	content := []byte(`{"hello":"world"}`)
-	if err := WriteFileAtomic(path, content, 0644); err != nil {
-		t.Fatalf("WriteFileAtomic: %v", err)
+	if err := WriteFile(path, content, 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 	got, err := os.ReadFile(path)
 	if err != nil {
@@ -33,13 +33,13 @@ func TestWriteFileAtomicRoundTrip(t *testing.T) {
 	}
 }
 
-func TestWriteFileAtomicCreatesFile(t *testing.T) {
+func TestWriteFileCreatesFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "newfile.json")
 	content := []byte(`{"created":true}`)
-	if err := WriteFileAtomic(path, content, 0600); err != nil {
-		t.Fatalf("WriteFileAtomic: %v", err)
+	if err := WriteFile(path, content, 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 	got, err := os.ReadFile(path)
 	if err != nil {
@@ -50,14 +50,14 @@ func TestWriteFileAtomicCreatesFile(t *testing.T) {
 	}
 }
 
-func TestWriteFileAtomicRenameFailure(t *testing.T) {
+func TestWriteFileRenameFailure(t *testing.T) {
 	// Do NOT call t.Parallel(): this test mutates a package-level var (renameFunc).
 	dir := t.TempDir()
 	path := filepath.Join(dir, "target.json")
 	original := []byte(`{"original":true}`)
 	// Write initial content
-	if err := WriteFileAtomic(path, original, 0644); err != nil {
-		t.Fatalf("initial WriteFileAtomic: %v", err)
+	if err := WriteFile(path, original, 0644); err != nil {
+		t.Fatalf("initial WriteFile: %v", err)
 	}
 
 	// Override renameFunc to simulate failure
@@ -68,8 +68,8 @@ func TestWriteFileAtomicRenameFailure(t *testing.T) {
 	defer func() { renameFunc = oldRename }()
 
 	// Attempt to overwrite with new content — should fail
-	if err := WriteFileAtomic(path, []byte(`{"new":true}`), 0644); err == nil {
-		t.Fatal("expected error from WriteFileAtomic on rename failure, got nil")
+	if err := WriteFile(path, []byte(`{"new":true}`), 0644); err == nil {
+		t.Fatal("expected error from WriteFile on rename failure, got nil")
 	}
 
 	// Original content must still be intact

@@ -96,12 +96,6 @@ func runActivate(t *testing.T, ticketID, repoID, approach string, deps activateD
 	return activate(context.Background(), store, cfg, ticketID, repoID, approach, deps)
 }
 
-// runActivateWithStore is like runActivate but uses a provided store (for multi-call tests).
-func runActivateWithStore(t *testing.T, store *state.Store, cfg *config.Config, ticketID, repoID, approach string, deps activateDeps) (state.ActivationEntry, error) {
-	t.Helper()
-	return activate(context.Background(), store, cfg, ticketID, repoID, approach, deps)
-}
-
 func TestActivate_StarterPromptIncludesRichJiraContext(t *testing.T) {
 	dir := t.TempDir()
 	store, err := state.Open(filepath.Join(dir, "state.json"))

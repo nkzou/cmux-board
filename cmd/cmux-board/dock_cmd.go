@@ -152,7 +152,7 @@ func runDockWithDeps(cmd *cobra.Command, _ []string, deps dockDeps) error {
 	debug, _ := cmd.Flags().GetBool("debug")
 
 	// Resolve config directory and paths.
-	configDir, err := resolveRootConfigDir()
+	configDir, err := config.ResolveConfigDir()
 	if err != nil {
 		return fmt.Errorf("failed to resolve config directory: %w", err)
 	}

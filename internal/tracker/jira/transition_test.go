@@ -8,14 +8,6 @@ import (
 	"github.com/nkzou/cmux-board/internal/tracker"
 )
 
-const workitemViewJSON = `{
-  "id": "10001",
-  "key": "PROJ-1",
-  "fields": {
-    "status": {"id": "1", "name": "To Do"}
-  }
-}`
-
 const transitionSuccessJSON = `{
   "results": [{"status":"SUCCESS","message":"Work item PROJ-1 has been successfully transitioned to In Progress","id":"PROJ-1"}],
   "totalCount": 1,

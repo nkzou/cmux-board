@@ -8,7 +8,7 @@
 #   1. Additive-only cmux destructors (F-NEW)
 #   2. claude --bg uses cmd.Dir, never --cwd (F13, Codex Finding 8)
 #   3. cmux focus-pane, never bare cmux focus (F14, Codex Finding 8)
-#   4. MergePulledTickets is the only Tickets-map write path (F-NEW5, Codex Finding 9)
+#   4. No direct Tickets-map assignment outside store files (F-NEW5, Codex Finding 9)
 #   5. No direct *State field mutation outside store files (F17, Codex Finding 4)
 #   6. HTTP headers never logged (F20, Codex Finding 3)
 #   7. No git-status dirty-worktree check in focus/activate paths (E9)
@@ -72,7 +72,7 @@ else
   echo "  OK (0 matches)"
 fi
 
-# ── Arm 4: MergePulledTickets is the only Tickets= write path ────────────────
+# ── Arm 4: no direct Tickets= assignment outside store files ────────────────
 echo "Arm 4: direct .Tickets= assignment outside store files..."
 MATCHES=$(git grep -nE 'state\.State\)\.Tickets\s*=' -- internal/ ':!*_store*.go' ':!*_test.go' 2>/dev/null || true)
 if [ -n "$MATCHES" ]; then

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -23,9 +22,6 @@ import (
 // Crockford-base32 alphabet (lowercase): 0-9 and a-z minus i, l, o, u.
 // This is NOT the same as hex — hex uses only [0-9a-f].
 const actIDShortRegex = `^[0-9a-hjkmnp-tv-z]{8}$`
-
-// actIDShortRE is the compiled actIDShortRegex.
-var actIDShortRE = regexp.MustCompile(actIDShortRegex)
 
 // ErrRepoNotRegistered is returned when the requested repoID is absent from cfg.Repos.
 type ErrRepoNotRegistered struct {
@@ -316,13 +312,6 @@ func activate(
 		return state.ActivationEntry{}, fmt.Errorf("activation %s missing from state after completion", actID.String())
 	}
 	return *result, nil
-}
-
-// generateActID generates a new ULID and returns its full string form and the
-// 8-char Crockford-base32 lowercase short form.
-func generateActID() (ulid.ULID, string) {
-	actID := ulid.Make()
-	return actID, strings.ToLower(actID.String())[:8]
 }
 
 // findActivationMutable returns a pointer into the live state slice for the given activationID.

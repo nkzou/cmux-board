@@ -144,7 +144,7 @@ func checkClaudeVersion(ctx context.Context) (*claudeResult, error) {
 // checkAgentView ensures Claude Code agent view is not disabled.
 func checkAgentView(ctx context.Context) error {
 	if err := claudecli.CheckDisableAgentView(ctx); err != nil {
-		return fmt.Errorf("Claude Code agent view is disabled (CLAUDE_CODE_DISABLE_AGENT_VIEW or disableAgentView setting).\ncmux-board requires agent view. Unset the env var or setting and restart.\nDetail: %w", err)
+		return fmt.Errorf("agent view is disabled in Claude Code (CLAUDE_CODE_DISABLE_AGENT_VIEW or disableAgentView setting).\ncmux-board requires agent view. Unset the env var or setting and restart.\nDetail: %w", err)
 	}
 	return nil
 }

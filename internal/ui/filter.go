@@ -28,26 +28,6 @@ func filterTickets(tickets map[string]*state.TicketState, query string) []string
 	return out
 }
 
-// filterTicketsByState is the same as filterTickets but accepts map[string]state.TicketState
-// (value, not pointer), matching the State.Tickets field type.
-func filterTicketsByState(tickets map[string]state.TicketState, query string) []string {
-	if query == "" {
-		ids := make([]string, 0, len(tickets))
-		for id := range tickets {
-			ids = append(ids, id)
-		}
-		return ids
-	}
-	lower := strings.ToLower(query)
-	var out []string
-	for id, t := range tickets {
-		if ticketMatchesFilter(t, lower) {
-			out = append(out, id)
-		}
-	}
-	return out
-}
-
 // ticketMatchesFilter reports whether a ticket should be emphasized for query.
 // query may already be lower-cased by callers.
 func ticketMatchesFilter(t state.TicketState, query string) bool {

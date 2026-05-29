@@ -206,35 +206,3 @@ func TestConfigureColumns_UnknownStatusWarning(t *testing.T) {
 		t.Errorf("expected warning about unknown status 'Foo', got output: %q", out)
 	}
 }
-
-// TestSlugifyStatus verifies the ID generation helper.
-func TestSlugifyStatus(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"In Progress", "in-progress"},
-		{"To Do", "to-do"},
-		{"Done", "done"},
-		{"  Weird  State  ", "weird--state"},
-		{"ALLCAPS", "allcaps"},
-	}
-	for _, tt := range tests {
-		got := slugifyStatus(tt.input)
-		// We only check that it's lowercase, non-empty, and contains no spaces.
-		if strings.Contains(got, " ") {
-			t.Errorf("slugifyStatus(%q) = %q contains space", tt.input, got)
-		}
-		if got == "" {
-			t.Errorf("slugifyStatus(%q) = empty string", tt.input)
-		}
-		// Check exact match for simple cases.
-		if tt.input == "In Progress" && got != "in-progress" {
-			t.Errorf("slugifyStatus(%q) = %q, want %q", tt.input, got, "in-progress")
-		}
-		if tt.input == "Done" && got != "done" {
-			t.Errorf("slugifyStatus(%q) = %q, want %q", tt.input, got, "done")
-		}
-	}
-}

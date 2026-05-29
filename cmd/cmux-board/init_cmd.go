@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/nkzou/cmux-board/internal/atomicfile"
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/initwizard"
 	"github.com/nkzou/cmux-board/internal/tracker/jira"
@@ -72,7 +73,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// --force: restore state.json if it existed before the run.
 	if force && savedStateBytes != nil {
 		statePath := filepath.Join(configDir, config.StateFileName)
-		if err := config.WriteFileAtomic(statePath, savedStateBytes, 0644); err != nil {
+		if err := atomicfile.WriteFile(statePath, savedStateBytes, 0644); err != nil {
 			return fmt.Errorf("--force: failed to restore state.json: %w", err)
 		}
 	}

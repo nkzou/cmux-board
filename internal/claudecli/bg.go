@@ -109,3 +109,58 @@ func redactArgv(argv []string) []string {
 	copy(out, argv)
 	return out
 }
+
+// IsOrphan re-queries the live claude agent list for the given worktree and returns
+// true if the cached shortID is no longer present. This is called lazily on activation
+// focus (not on every tick) to avoid hammering the claude CLI.
+//
+// shortID is the 8-hex-char identifier stored in ActivationEntry.ClaudeShortID.
+// worktree is the absolute path to the git linked worktree, used to scope the query.
+//
+// A fresh agent-list query (via Agents) is issued on every call; there is no
+// in-process caching here. The caller (picker focus handler in M-008) is responsible
+// for caching the result in the BubbleTea model between keypresses.
+func IsOrphan(ctx context.Context, worktree, shortID string) (bool, error) {
+	if shortID == "" {
+		// No short ID recorded → treat as orphan (activation was never fully journaled).
+		return true, nil
+	}
+	entries, err := Agents(ctx, AgentsArgs{CWD: worktree})
+	if err != nil {
+		return false, fmt.Errorf("orphan check failed for worktree %s: %w", worktree, err)
+	}
+	match := FindByShortID(entries, shortID)
+	return match == nil, nil
+}
+
+// Respawn launches a new Claude background session for an orphaned activation.
+// It is a thin wrapper around LaunchBackground. The caller MUST journal the new
+// BGResult.ShortID into the activation entry via store.Mutate after this returns.
+//
+// Respawn is invoked by the picker `r` key handler in the BubbleTea update loop (M-008).
+// A new cmux workspace is also created for the respawned session; that is M-008's concern.
+func Respawn(ctx context.Context, args BGArgs) (BGResult, error) {
+	return LaunchBackground(ctx, args)
+}
+
+// BuildAttachCommand returns the shell command string that the cmux workspace layout
+// JSON injects into the agent pane terminal. cmux sends this as keystrokes (with Enter)
+// to the terminal surface; it is NOT executed by cmux-board's own process.
+//
+// The short_id is the 8-hex-char identifier captured from `claude --bg` stdout
+// (stored as ActivationEntry.ClaudeShortID).
+//
+// CMUX_CLAUDE_HOOKS_DISABLED=1 bypasses the cmux claude wrapper. The wrapper's
+// builtin-subcommand list (agents|auth|...) does not include 'attach', so it
+// would otherwise inject '--session-id NEW_UUID --settings ...' before our
+// argv. Claude's commander then no longer parses 'attach' as a subcommand —
+// it treats 'attach <id>' as the [prompt] positional and opens a fresh
+// interactive session with 'attach' as the first user message. The
+// CMUX_CLAUDE_HOOKS_DISABLED=1 prefix makes the wrapper exec the real claude
+// unchanged, so 'claude attach <id>' attaches to the background session as
+// intended.
+//
+// Example return value: "CMUX_CLAUDE_HOOKS_DISABLED=1 claude attach 3174068b"
+func BuildAttachCommand(shortID string) string {
+	return fmt.Sprintf("CMUX_CLAUDE_HOOKS_DISABLED=1 claude attach %s", shortID)
+}

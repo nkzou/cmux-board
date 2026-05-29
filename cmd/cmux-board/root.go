@@ -1,12 +1,12 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/nkzou/cmux-board/internal/config"
+	"github.com/nkzou/cmux-board/internal/state"
 )
 
 func init() {
@@ -18,7 +18,7 @@ func init() {
 		if cmd.Name() == "init" {
 			return nil
 		}
-		dir, err := resolveRootConfigDir()
+		dir, err := config.ResolveConfigDir()
 		if err != nil {
 			return err
 		}
@@ -26,14 +26,30 @@ func init() {
 	}
 }
 
-// resolveRootConfigDir returns the config dir, honouring CMUX_BOARD_CONFIG_DIR env var.
-func resolveRootConfigDir() (string, error) {
-	if env := os.Getenv(config.EnvConfigDir); env != "" {
-		return env, nil
-	}
-	home, err := os.UserHomeDir()
+// loadConfigForCmd resolves the default config path and loads it. Shared by the
+// repos subcommands. Load refuses at schema v1.
+func loadConfigForCmd() (config.Config, string, error) {
+	cfgPath, err := config.DefaultConfigPath()
 	if err != nil {
-		return "", err
+		return config.Config{}, "", fmt.Errorf("failed to resolve config path: %w", err)
 	}
-	return filepath.Join(home, config.DefaultConfigDir), nil
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return config.Config{}, "", fmt.Errorf("failed to load config: %w", err)
+	}
+	return cfg, cfgPath, nil
+}
+
+// openStateForCmd opens the default state store. state.Open returns an empty
+// DefaultState on a missing file.
+func openStateForCmd() (*state.Store, error) {
+	statePath, err := config.DefaultStatePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve state path: %w", err)
+	}
+	store, err := state.Open(statePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open state: %w", err)
+	}
+	return store, nil
 }

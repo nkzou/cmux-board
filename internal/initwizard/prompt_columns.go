@@ -45,7 +45,7 @@ func ConfigureColumns(ctx context.Context, w io.Writer, r io.Reader, a tracker.I
 			cols := make([]tracker.Column, len(statuses))
 			for i, s := range statuses {
 				cols[i] = tracker.Column{
-					ID:        slugifyStatus(s),
+					ID:        tracker.Slug(s),
 					Name:      s,
 					StatusIDs: []string{s},
 				}
@@ -135,7 +135,7 @@ func buildColumnsInteractive(w io.Writer, reader *bufio.Reader, discoveredStatus
 		}
 
 		cols = append(cols, tracker.Column{
-			ID:        slugifyStatus(name),
+			ID:        tracker.Slug(name),
 			Name:      name,
 			StatusIDs: statuses,
 		})
@@ -173,27 +173,4 @@ func promptNonEmpty(w io.Writer, reader *bufio.Reader, label string, maxRetries 
 		fmt.Fprintln(w, "Value cannot be empty. Try again.")
 	}
 	return "", fmt.Errorf("%s: no value entered after %d attempts", label, maxRetries)
-}
-
-// slugifyStatus converts a status name into a safe column ID.
-// "In Progress" → "in-progress"
-func slugifyStatus(name string) string {
-	lower := strings.ToLower(strings.TrimSpace(name))
-	var b strings.Builder
-	for _, r := range lower {
-		switch {
-		case r >= 'a' && r <= 'z':
-			b.WriteRune(r)
-		case r >= '0' && r <= '9':
-			b.WriteRune(r)
-		default:
-			b.WriteRune('-')
-		}
-	}
-	// Collapse consecutive dashes, trim leading/trailing.
-	s := b.String()
-	for strings.Contains(s, "--") {
-		s = strings.ReplaceAll(s, "--", "-")
-	}
-	return strings.Trim(s, "-")
 }

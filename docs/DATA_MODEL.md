@@ -12,8 +12,8 @@ ticket leaves the polled set, `removed_at` is set to the removal timestamp; the 
 is kept for historical resolution of activations.
 
 Tracker-owned fields (`summary`, `status`, `last_known_status`, `assignee_id`,
-`labels`, `priority`, `url`, `updated_at`, `raw`) are overwritten by `MergePulledTickets`
-on each poll.
+`labels`, `priority`, `url`, `updated_at`, `raw`) are overwritten by the refresh poll
+(`internal/refresh`) on each tick.
 
 Local-only fields (`assigned_repo_ids`, `removed_at`) are preserved across polls and
 never overwritten by tracker data.
@@ -40,12 +40,13 @@ Key fields:
 Identified by `repo_id` (a lowercase slug derived from the directory name). The
 authoritative `repo_id` derivation is in `internal/config/repo_id.go`.
 
-## MergePulledTickets contract
+## Ticket write contract
 
-`MergePulledTickets` in `internal/sync/` is the only function that writes the
-`Tickets` map. It overwrites tracker-owned fields and preserves local-only fields.
-No other code path modifies `state.Tickets` directly -- this is enforced by
-`scripts/check_additive_only.sh` arm 4.
+The refresh poll (`internal/refresh`) is the only path that writes the `Tickets`
+map, and it does so through `store.Mutate`. It overwrites tracker-owned fields on
+existing tickets and preserves local-only fields; it never inserts or deletes
+tickets. No code path modifies `state.Tickets` directly outside the store. This is
+enforced by `scripts/check_additive_only.sh` arm 4.
 
 ## Store
 
