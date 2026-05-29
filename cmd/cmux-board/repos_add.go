@@ -32,13 +32,9 @@ derived by lowercasing the display name and collapsing non-[a-z0-9-] runs to '-'
 			}
 
 			// Load existing config. Refuses at schema v1.
-			cfgPath, err := config.DefaultConfigPath()
+			cfg, cfgPath, err := loadConfigForCmd()
 			if err != nil {
-				return fmt.Errorf("failed to resolve config path: %w", err)
-			}
-			cfg, err := config.Load(cfgPath)
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
+				return err
 			}
 
 			// Validate git repo (T-047). This check MUST happen before any mutation.

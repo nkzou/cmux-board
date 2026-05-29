@@ -40,8 +40,8 @@ func ResolveCredentialsPath(flagVal string) (string, error) {
 	return filepath.Join(home, DefaultConfigDir, CredentialsFileName), nil
 }
 
-// resolveConfigDir returns the config directory, honouring CMUX_BOARD_CONFIG_DIR if set.
-func resolveConfigDir() (string, error) {
+// ResolveConfigDir returns the config directory, honouring CMUX_BOARD_CONFIG_DIR if set.
+func ResolveConfigDir() (string, error) {
 	if env := os.Getenv(EnvConfigDir); env != "" {
 		return env, nil
 	}
@@ -55,7 +55,7 @@ func resolveConfigDir() (string, error) {
 // DefaultConfigPath returns the path to config.json.
 // Respects CMUX_BOARD_CONFIG_DIR if set.
 func DefaultConfigPath() (string, error) {
-	dir, err := resolveConfigDir()
+	dir, err := ResolveConfigDir()
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +65,7 @@ func DefaultConfigPath() (string, error) {
 // DefaultStatePath returns the path to state.json.
 // Respects CMUX_BOARD_CONFIG_DIR if set.
 func DefaultStatePath() (string, error) {
-	dir, err := resolveConfigDir()
+	dir, err := ResolveConfigDir()
 	if err != nil {
 		return "", err
 	}

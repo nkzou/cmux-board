@@ -28,18 +28,13 @@ With --json, outputs a JSON array of objects with the same fields plus
   "activation_refs" (number of activation entries with this repo_id)`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfgPath, err := config.DefaultConfigPath()
+			cfg, _, err := loadConfigForCmd()
 			if err != nil {
-				return fmt.Errorf("failed to resolve config path: %w", err)
+				return err
 			}
 			statePath, err := config.DefaultStatePath()
 			if err != nil {
 				return fmt.Errorf("failed to resolve state path: %w", err)
-			}
-
-			cfg, err := config.Load(cfgPath)
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
 			}
 
 			// State is optional; missing or corrupt state.json is non-fatal for list.

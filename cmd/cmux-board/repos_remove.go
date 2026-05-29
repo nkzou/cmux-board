@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nkzou/cmux-board/internal/config"
-	"github.com/nkzou/cmux-board/internal/state"
 )
 
 func newReposRemoveCmd() *cobra.Command {
@@ -24,26 +23,14 @@ and must be cleaned up manually.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoID := args[0]
 
-			cfgPath, err := config.DefaultConfigPath()
+			// Load config (refuses at schema v1) and state for reference scanning.
+			cfg, cfgPath, err := loadConfigForCmd()
 			if err != nil {
-				return fmt.Errorf("failed to resolve config path: %w", err)
+				return err
 			}
-			statePath, err := config.DefaultStatePath()
+			store, err := openStateForCmd()
 			if err != nil {
-				return fmt.Errorf("failed to resolve state path: %w", err)
-			}
-
-			// Load config. Refuses at schema v1.
-			cfg, err := config.Load(cfgPath)
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Load state for reference scanning.
-			// state.Open returns empty DefaultState on missing file.
-			store, err := state.Open(statePath)
-			if err != nil {
-				return fmt.Errorf("failed to open state: %w", err)
+				return err
 			}
 			st, _ := store.Snapshot()
 
