@@ -8,13 +8,6 @@ import (
 	"github.com/nkzou/cmux-board/internal/state"
 )
 
-// countSetStatusCalls runs emitPill and returns how many non-nil Cmds were returned.
-// It does NOT execute the Cmds (which would call the real cmux binary).
-func countEmitCmds(cmds []interface{ cmd() interface{} }) int {
-	// Unused helper — we count directly below.
-	return 0
-}
-
 // makeTestModelForPills builds a minimal Model for pill tests.
 func makeTestModelForPills(t *testing.T) Model {
 	t.Helper()

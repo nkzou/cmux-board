@@ -62,28 +62,6 @@ var (
 		BottomRight: "┛",
 	}
 
-	columnBorderActive = lipgloss.Border{
-		Top:         "━",
-		Bottom:      "━",
-		Left:        "┃",
-		Right:       "┃",
-		TopLeft:     "┏",
-		TopRight:    "┓",
-		BottomLeft:  "┗",
-		BottomRight: "┛",
-	}
-
-	dragTargetBorder = lipgloss.Border{
-		Top:         "═",
-		Bottom:      "═",
-		Left:        "║",
-		Right:       "║",
-		TopLeft:     "╔",
-		TopRight:    "╗",
-		BottomLeft:  "╚",
-		BottomRight: "╝",
-	}
-
 	ticketBorder = lipgloss.Border{
 		Top:         "─",
 		Bottom:      "─",
