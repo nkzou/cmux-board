@@ -88,16 +88,18 @@ type Board struct {
 // Ticket represents a single issue/ticket with normalized fields.
 // Raw is an adapter escape hatch for tracker-specific data (e.g., Jira workflow transition IDs).
 type Ticket struct {
-	ID         string         `json:"id,omitempty"`
-	Key        string         `json:"key,omitempty"`
-	Summary    string         `json:"summary,omitempty"`
-	Status     string         `json:"status,omitempty"`
-	URL        string         `json:"url,omitempty"`
-	AssigneeID string         `json:"assigneeId,omitempty"`
-	Labels     []string       `json:"labels,omitempty"`
-	Priority   string         `json:"priority,omitempty"`
-	UpdatedAt  time.Time      `json:"updatedAt,omitempty"`
-	Raw        map[string]any `json:"raw,omitempty"`
+	ID            string         `json:"id,omitempty"`
+	Key           string         `json:"key,omitempty"`
+	Summary       string         `json:"summary,omitempty"`
+	Status        string         `json:"status,omitempty"`
+	URL           string         `json:"url,omitempty"`
+	IssueType     string         `json:"issueType,omitempty"`
+	AssigneeID    string         `json:"assigneeId,omitempty"`
+	AssigneeEmail string         `json:"assigneeEmail,omitempty"`
+	Labels        []string       `json:"labels,omitempty"`
+	Priority      string         `json:"priority,omitempty"`
+	UpdatedAt     time.Time      `json:"updatedAt,omitempty"`
+	Raw           map[string]any `json:"raw,omitempty"`
 }
 
 // IssueTracker is the port (interface) that all tracker adapters must implement.

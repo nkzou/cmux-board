@@ -3,6 +3,7 @@ package state
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nkzou/cmux-board/internal/tracker"
 )
@@ -13,13 +14,21 @@ import (
 func TestImportJiraTicket_Idempotent(t *testing.T) {
 	t.Parallel()
 	s := DefaultState()
+	firstUpdatedAt := time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC)
+	secondUpdatedAt := time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC)
 
 	first := tracker.Ticket{
-		Key:     "PROJ-1",
-		Summary: "first",
-		Status:  "To Do",
-		URL:     "http://first",
-		Labels:  []string{"backend"},
+		ID:            "10001",
+		Key:           "PROJ-1",
+		Summary:       "first",
+		Status:        "To Do",
+		URL:           "http://first",
+		IssueType:     "Task",
+		AssigneeID:    "acc-first",
+		AssigneeEmail: "first@example.com",
+		Priority:      "Low",
+		Labels:        []string{"backend"},
+		UpdatedAt:     firstUpdatedAt,
 	}
 	ImportJiraTicket(&s, first)
 
@@ -30,11 +39,17 @@ func TestImportJiraTicket_Idempotent(t *testing.T) {
 	s.Tickets["PROJ-1"] = ts
 
 	second := tracker.Ticket{
-		Key:     "PROJ-1",
-		Summary: "updated",
-		Status:  "In Progress",
-		URL:     "http://updated",
-		Labels:  []string{"frontend"},
+		ID:            "10002",
+		Key:           "PROJ-1",
+		Summary:       "updated",
+		Status:        "In Progress",
+		URL:           "http://updated",
+		IssueType:     "Bug",
+		AssigneeID:    "acc-second",
+		AssigneeEmail: "second@example.com",
+		Priority:      "High",
+		Labels:        []string{"frontend"},
+		UpdatedAt:     secondUpdatedAt,
 	}
 	ImportJiraTicket(&s, second)
 
@@ -49,8 +64,26 @@ func TestImportJiraTicket_Idempotent(t *testing.T) {
 	if got.URL != "http://updated" {
 		t.Errorf("URL: got %q, want 'http://updated'", got.URL)
 	}
+	if got.ID != "10002" {
+		t.Errorf("ID: got %q, want '10002'", got.ID)
+	}
+	if got.IssueType != "Bug" {
+		t.Errorf("IssueType: got %q, want 'Bug'", got.IssueType)
+	}
+	if got.Priority != "High" {
+		t.Errorf("Priority: got %q, want 'High'", got.Priority)
+	}
+	if got.AssigneeID != "acc-second" {
+		t.Errorf("AssigneeID: got %q, want 'acc-second'", got.AssigneeID)
+	}
+	if got.AssigneeEmail != "second@example.com" {
+		t.Errorf("AssigneeEmail: got %q, want 'second@example.com'", got.AssigneeEmail)
+	}
 	if len(got.Labels) != 1 || got.Labels[0] != "frontend" {
 		t.Errorf("Labels: got %v, want ['frontend']", got.Labels)
+	}
+	if got.UpdatedAt == nil || !got.UpdatedAt.Equal(secondUpdatedAt) {
+		t.Errorf("UpdatedAt: got %v, want %v", got.UpdatedAt, secondUpdatedAt)
 	}
 	// Local-only fields preserved.
 	if got.X != 3 || got.Y != 7 {
@@ -70,10 +103,17 @@ func TestImportJiraTicket_Idempotent(t *testing.T) {
 func TestImportJiraTicket_PopulatesURLAndLabels(t *testing.T) {
 	t.Parallel()
 	s := DefaultState()
+	updatedAt := time.Date(2026, 5, 28, 9, 30, 0, 0, time.UTC)
 	tk := tracker.Ticket{
-		Key:    "PROJ-2",
-		URL:    "https://jira.example.com/browse/PROJ-2",
-		Labels: []string{"p0", "security"},
+		ID:            "10020",
+		Key:           "PROJ-2",
+		URL:           "https://jira.example.com/browse/PROJ-2",
+		IssueType:     "Bug",
+		AssigneeID:    "acc-20",
+		AssigneeEmail: "dev20@example.com",
+		Priority:      "Highest",
+		Labels:        []string{"p0", "security"},
+		UpdatedAt:     updatedAt,
 	}
 	ImportJiraTicket(&s, tk)
 
@@ -81,8 +121,26 @@ func TestImportJiraTicket_PopulatesURLAndLabels(t *testing.T) {
 	if got.URL != "https://jira.example.com/browse/PROJ-2" {
 		t.Errorf("URL: got %q, want 'https://jira.example.com/browse/PROJ-2'", got.URL)
 	}
+	if got.ID != "10020" {
+		t.Errorf("ID: got %q, want '10020'", got.ID)
+	}
+	if got.IssueType != "Bug" {
+		t.Errorf("IssueType: got %q, want 'Bug'", got.IssueType)
+	}
+	if got.Priority != "Highest" {
+		t.Errorf("Priority: got %q, want 'Highest'", got.Priority)
+	}
+	if got.AssigneeID != "acc-20" {
+		t.Errorf("AssigneeID: got %q, want 'acc-20'", got.AssigneeID)
+	}
+	if got.AssigneeEmail != "dev20@example.com" {
+		t.Errorf("AssigneeEmail: got %q, want 'dev20@example.com'", got.AssigneeEmail)
+	}
 	if len(got.Labels) != 2 || got.Labels[0] != "p0" || got.Labels[1] != "security" {
 		t.Errorf("Labels: got %v, want ['p0','security']", got.Labels)
+	}
+	if got.UpdatedAt == nil || !got.UpdatedAt.Equal(updatedAt) {
+		t.Errorf("UpdatedAt: got %v, want %v", got.UpdatedAt, updatedAt)
 	}
 }
 

@@ -75,6 +75,56 @@ func TestCanvas_SingleCardAtOrigin(t *testing.T) {
 	}
 }
 
+func TestCardWidth_NarrowerThanPreviousLayout(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		canvasW int
+		want    int
+	}{
+		{80, 18},
+		{120, 28},
+		{60, 14},
+		{30, 12},
+		{10, 10},
+	}
+	for _, tt := range tests {
+		if got := cardWidth(tt.canvasW); got != tt.want {
+			t.Errorf("cardWidth(%d) = %d, want %d", tt.canvasW, got, tt.want)
+		}
+	}
+}
+
+func TestRenderTicket_NarrowCardWrapsFullTitle(t *testing.T) {
+	t.Parallel()
+	title := "Fix the exceptionally verbose user login synchronization bug without losing retries"
+	width := cardWidth(80)
+	rendered := renderTicket(renderTicketParams{
+		ticket: Ticket{
+			Key:     "T-1",
+			Summary: title,
+			Source:  "jira",
+			Status:  "In Progress",
+		},
+		width:       width,
+		accentColor: defaultColors().primary,
+		colors:      defaultColors(),
+	})
+
+	for _, word := range strings.Fields(title) {
+		if !strings.Contains(rendered, word) {
+			t.Fatalf("rendered narrow card is missing title word %q:\n%s", word, rendered)
+		}
+	}
+	if len(strings.Split(rendered, "\n")) <= 4 {
+		t.Fatalf("expected narrow title to wrap into a taller card:\n%s", rendered)
+	}
+	for _, line := range strings.Split(rendered, "\n") {
+		if got := lipgloss.Width(line); got > width+2 {
+			t.Fatalf("line width = %d, want <= %d for line %q\n%s", got, width+2, line, rendered)
+		}
+	}
+}
+
 func TestCanvas_TwoNonOverlapping(t *testing.T) {
 	t.Parallel()
 	tickets := map[string]state.TicketState{

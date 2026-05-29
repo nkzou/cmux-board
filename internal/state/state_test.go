@@ -32,14 +32,19 @@ func TestTicketState_NewFields(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC().Truncate(time.Second)
 	orig := TicketState{
-		Key:         "PROJ-1",
-		X:           5,
-		Y:           7,
-		Source:      "local",
-		LocalStatus: "Open",
-		URL:         "http://x",
-		Labels:      []string{"a"},
-		UpdatedAt:   &now,
+		Key:           "PROJ-1",
+		ID:            "10042",
+		X:             5,
+		Y:             7,
+		Source:        "local",
+		LocalStatus:   "Open",
+		IssueType:     "Bug",
+		AssigneeID:    "acc-1",
+		AssigneeEmail: "dev@example.com",
+		Priority:      "High",
+		URL:           "http://x",
+		Labels:        []string{"a"},
+		UpdatedAt:     &now,
 	}
 	data, err := json.Marshal(orig)
 	if err != nil {
@@ -60,6 +65,21 @@ func TestTicketState_NewFields(t *testing.T) {
 	}
 	if got.LocalStatus != "Open" {
 		t.Errorf("LocalStatus: got %q, want 'Open'", got.LocalStatus)
+	}
+	if got.ID != "10042" {
+		t.Errorf("ID: got %q, want '10042'", got.ID)
+	}
+	if got.IssueType != "Bug" {
+		t.Errorf("IssueType: got %q, want 'Bug'", got.IssueType)
+	}
+	if got.AssigneeID != "acc-1" {
+		t.Errorf("AssigneeID: got %q, want 'acc-1'", got.AssigneeID)
+	}
+	if got.AssigneeEmail != "dev@example.com" {
+		t.Errorf("AssigneeEmail: got %q, want 'dev@example.com'", got.AssigneeEmail)
+	}
+	if got.Priority != "High" {
+		t.Errorf("Priority: got %q, want 'High'", got.Priority)
 	}
 	if got.URL != "http://x" {
 		t.Errorf("URL: got %q, want 'http://x'", got.URL)

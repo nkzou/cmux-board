@@ -22,10 +22,11 @@ type acliIssue struct {
 }
 
 type acliIssueFields struct {
-	Summary  string       `json:"summary"`
-	Status   *acliStatus  `json:"status"`
-	Assignee *acliUser    `json:"assignee"`
-	Priority *acliPriority `json:"priority"`
+	Summary   string         `json:"summary"`
+	Status    *acliStatus    `json:"status"`
+	IssueType *acliIssueType `json:"issuetype"`
+	Assignee  *acliUser      `json:"assignee"`
+	Priority  *acliPriority  `json:"priority"`
 }
 
 type acliStatus struct {
@@ -39,6 +40,10 @@ type acliUser struct {
 }
 
 type acliPriority struct {
+	Name string `json:"name"`
+}
+
+type acliIssueType struct {
 	Name string `json:"name"`
 }
 
@@ -152,16 +157,22 @@ func extractProjectKey(location string) string {
 // acliIssueToTicket converts an acliIssue to our tracker.Ticket.
 func acliIssueToTicket(iss acliIssue, site string) tracker.Ticket {
 	var (
-		statusName string
-		assigneeID string
-		priority   string
+		statusName    string
+		issueType     string
+		assigneeID    string
+		assigneeEmail string
+		priority      string
 	)
 
 	if iss.Fields.Status != nil {
 		statusName = iss.Fields.Status.Name
 	}
+	if iss.Fields.IssueType != nil {
+		issueType = iss.Fields.IssueType.Name
+	}
 	if iss.Fields.Assignee != nil {
 		assigneeID = iss.Fields.Assignee.AccountID
+		assigneeEmail = iss.Fields.Assignee.Email
 	}
 	if iss.Fields.Priority != nil {
 		priority = iss.Fields.Priority.Name
@@ -170,15 +181,17 @@ func acliIssueToTicket(iss acliIssue, site string) tracker.Ticket {
 	url := "https://" + site + "/browse/" + iss.Key
 
 	return tracker.Ticket{
-		ID:         iss.ID,
-		Key:        iss.Key,
-		Summary:    iss.Fields.Summary,
-		Status:     statusName,
-		URL:        url,
-		AssigneeID: assigneeID,
-		Labels:     nil,   // not available via acli workitem search JSON
-		Priority:   priority,
-		UpdatedAt:  time.Time{}, // not available via acli workitem search JSON
-		Raw:        map[string]any{},
+		ID:            iss.ID,
+		Key:           iss.Key,
+		Summary:       iss.Fields.Summary,
+		Status:        statusName,
+		URL:           url,
+		IssueType:     issueType,
+		AssigneeID:    assigneeID,
+		AssigneeEmail: assigneeEmail,
+		Labels:        nil, // not available via acli workitem search JSON
+		Priority:      priority,
+		UpdatedAt:     time.Time{}, // not available via acli workitem search JSON
+		Raw:           map[string]any{},
 	}
 }

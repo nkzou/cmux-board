@@ -247,12 +247,25 @@ func ResumeActivation(
 	if entry.Step == state.StepWorktreeCreated {
 		tmpl := cfg.Claude.StarterPrompt
 		if tmpl == "" {
-			tmpl = ""
+			tmpl = config.DefaultStarterPromptTemplate
+		}
+		ticketForPrompt := state.PromptTicket(state.TicketState{Key: entry.TicketID})
+		if ts, ok := snap.Tickets[entry.TicketID]; ok {
+			ticketForPrompt = state.PromptTicket(ts)
+		}
+		prompt, err := claudecli.RenderPrompt(tmpl, claudecli.PromptData{
+			Ticket:       ticketForPrompt,
+			Repo:         repo,
+			WorktreePath: entry.WorktreePath,
+			ApproachName: entry.ApproachName,
+		})
+		if err != nil {
+			return state.ActivationEntry{}, fmt.Errorf("failed to render starter prompt: %w", err)
 		}
 		bgResult, err := claudecli.LaunchBackground(ctx, claudecli.BGArgs{
 			Worktree:       worktreeDir,
 			Name:           entry.ClaudeName,
-			Prompt:         tmpl,
+			Prompt:         prompt,
 			Model:          cfg.Claude.Model,
 			PermissionMode: cfg.Claude.PermissionMode,
 		})

@@ -18,8 +18,8 @@ import (
 
 // reconcileDeps groups injectable scanner functions for tests.
 type reconcileDeps struct {
-	listWorktrees func(ctx context.Context, repoPath string) ([]git.Worktree, error)
-	agents        func(ctx context.Context, args claudecli.AgentsArgs) ([]claudecli.AgentEntry, error)
+	listWorktrees  func(ctx context.Context, repoPath string) ([]git.Worktree, error)
+	agents         func(ctx context.Context, args claudecli.AgentsArgs) ([]claudecli.AgentEntry, error)
 	listWorkspaces func(ctx context.Context) ([]cmuxcli.Workspace, error)
 	listPanes      func(ctx context.Context, wsRef string) ([]cmuxcli.Pane, error)
 }
@@ -430,6 +430,16 @@ func TestResumeActivation_SkipsAlreadyCreatedSteps(t *testing.T) {
 	activationID := "01JTEST0000000000000000003"
 	// Seed entry with step:worktree_created — worktree step is done, claude/cmux are not.
 	store.Mutate(func(s *state.State) error { //nolint:errcheck
+		s.Tickets["PROJ-1"] = state.TicketState{
+			Key:           "PROJ-1",
+			ID:            "10001",
+			Source:        "jira",
+			Summary:       "Resume prompt",
+			Status:        "In Progress",
+			IssueType:     "Bug",
+			Priority:      "High",
+			AssigneeEmail: "dev@example.com",
+		}
 		s.Activations["PROJ-1"] = []state.ActivationEntry{{
 			ActivationID: activationID,
 			ActIDShort:   "dd330033",
@@ -448,9 +458,11 @@ func TestResumeActivation_SkipsAlreadyCreatedSteps(t *testing.T) {
 	})
 
 	cfg := buildTestCfg(t)
+	cfg.Claude.StarterPrompt = "{{.Ticket.ID}}|{{.Ticket.IssueType}}|{{.Ticket.Priority}}|{{.Ticket.AssigneeEmail}}|{{.Repo.ID}}|{{.ApproachName}}"
 	createWorktreeCalled := false
 	launchBackgroundCalled := false
 	newWorkspaceCalled := false
+	var capturedPrompt string
 
 	// Use the injectable variant of ResumeActivation.
 	err = resumeWithDeps(context.Background(), store, cfg, activationID, resumeDeps{
@@ -458,8 +470,9 @@ func TestResumeActivation_SkipsAlreadyCreatedSteps(t *testing.T) {
 			createWorktreeCalled = true
 			return nil
 		},
-		launchBackground: func(_ context.Context, _ claudecli.BGArgs) (claudecli.BGResult, error) {
+		launchBackground: func(_ context.Context, args claudecli.BGArgs) (claudecli.BGResult, error) {
 			launchBackgroundCalled = true
+			capturedPrompt = args.Prompt
 			return claudecli.BGResult{ShortID: "eeeeffff"}, nil
 		},
 		newWorkspace: func(_ context.Context, _ cmuxcli.NewWorkspaceArgs) (string, error) {
@@ -482,6 +495,9 @@ func TestResumeActivation_SkipsAlreadyCreatedSteps(t *testing.T) {
 	}
 	if !newWorkspaceCalled {
 		t.Error("NewWorkspaceWithLayout was NOT called but cmux step was missing")
+	}
+	if capturedPrompt != "10001|Bug|High|dev@example.com|repo1|test" {
+		t.Errorf("Prompt = %q, want rich rendered prompt", capturedPrompt)
 	}
 }
 
@@ -588,9 +604,27 @@ func resumeWithDeps(
 	}
 
 	if entry.Step == state.StepWorktreeCreated {
+		tmpl := cfg.Claude.StarterPrompt
+		if tmpl == "" {
+			tmpl = config.DefaultStarterPromptTemplate
+		}
+		ticketForPrompt := state.PromptTicket(state.TicketState{Key: entry.TicketID})
+		if ts, ok := snap.Tickets[entry.TicketID]; ok {
+			ticketForPrompt = state.PromptTicket(ts)
+		}
+		prompt, err := claudecli.RenderPrompt(tmpl, claudecli.PromptData{
+			Ticket:       ticketForPrompt,
+			Repo:         repo,
+			WorktreePath: entry.WorktreePath,
+			ApproachName: entry.ApproachName,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to render starter prompt: %w", err)
+		}
 		bgResult, err := deps.launchBackground(ctx, claudecli.BGArgs{
 			Worktree:       worktreeDir,
 			Name:           entry.ClaudeName,
+			Prompt:         prompt,
 			Model:          cfg.Claude.Model,
 			PermissionMode: cfg.Claude.PermissionMode,
 		})

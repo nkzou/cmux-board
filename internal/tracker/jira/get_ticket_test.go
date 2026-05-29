@@ -15,6 +15,7 @@ const workitemViewFullJSON = `{
   "key": "PROJ-42",
   "fields": {
     "summary": "Fix the thing",
+    "issuetype": {"name": "Task"},
     "status": {"id": "3", "name": "In Progress"},
     "assignee": {"accountId": "user-abc-123", "emailAddress": "dev@example.com"},
     "priority": {"name": "High"}
@@ -46,8 +47,14 @@ func TestGetTicket_Success(t *testing.T) {
 	if got.Priority != "High" {
 		t.Errorf("Priority: got %q, want %q", got.Priority, "High")
 	}
+	if got.IssueType != "Task" {
+		t.Errorf("IssueType: got %q, want %q", got.IssueType, "Task")
+	}
 	if got.AssigneeID != "user-abc-123" {
 		t.Errorf("AssigneeID: got %q, want %q", got.AssigneeID, "user-abc-123")
+	}
+	if got.AssigneeEmail != "dev@example.com" {
+		t.Errorf("AssigneeEmail: got %q, want %q", got.AssigneeEmail, "dev@example.com")
 	}
 
 	// Verify the correct acli sub-command was used.

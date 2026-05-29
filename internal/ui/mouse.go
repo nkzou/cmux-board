@@ -2,9 +2,10 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/nkzou/cmux-board/internal/state"
 	uispatial "github.com/nkzou/cmux-board/internal/ui/spatial"
@@ -36,7 +37,7 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleMousePress records the pressed ticket via zone hit-test.
+// handleMousePress records the pressed ticket via geometric hit-test.
 // If no ticket is hit, drag state is not set (no-op).
 func (m Model) handleMousePress(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Button != tea.MouseButtonLeft {
@@ -44,44 +45,21 @@ func (m Model) handleMousePress(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	// Reconcile zOrder against the current snapshot before hit-testing.
 	// View() reconciles via a value-receiver copy that never reaches Update; without this
-	// the first MouseMsg sees an empty zOrder and no zone is hit, breaking click and drag.
-	if snap, _ := m.store.Snapshot(); snap != nil {
+	// the first MouseMsg sees an empty zOrder and no card is hit, breaking click and drag.
+	snap, _ := m.store.Snapshot()
+	if snap != nil {
 		m.reconcileZOrder(snap)
 	}
-	// Find the topmost card that contains the cursor.
-	// Walk zOrder from the end (topmost) and check zone bounds.
-	key := ""
-	var dbg string
-	for i := len(m.zOrder) - 1; i >= 0; i-- {
-		k := m.zOrder[i]
-		if zone.DefaultManager != nil {
-			info := zone.Get(k)
-			if info == nil {
-				dbg += fmt.Sprintf(" %s=nil", k)
-				continue
-			}
-			if info.IsZero() {
-				dbg += fmt.Sprintf(" %s=zero", k)
-				continue
-			}
-			dbg += fmt.Sprintf(" %s=(%d,%d)-(%d,%d)", k, info.StartX, info.StartY, info.EndX, info.EndY)
-			if info.InBounds(msg) {
-				key = k
-				break
-			}
-		}
-	}
-	if key == "" {
-		m.dragDebug = fmt.Sprintf("press@(%d,%d) MISS zones:%s", msg.X, msg.Y, dbg)
+	key, found, dbg := m.hitTestTicketAt(snap, msg.X, msg.Y)
+	if !found {
+		m.dragDebug = fmt.Sprintf("press@(%d,%d) MISS boxes:%s", msg.X, msg.Y, dbg)
 		return m, nil
 	}
 	// Seed live-drag position from the card's current (x, y) so the canvas can
 	// render it in place until motion arrives.
 	startX, startY := 0, 0
-	if snap, _ := m.store.Snapshot(); snap != nil {
-		if t, ok := snap.Tickets[key]; ok {
-			startX, startY = t.X, t.Y
-		}
+	if t, ok := snap.Tickets[key]; ok {
+		startX, startY = t.X, t.Y
 	}
 	m.dragging = &dragState{
 		key:      key,
@@ -93,6 +71,82 @@ func (m Model) handleMousePress(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	m.dragDebug = fmt.Sprintf("press@(%d,%d) HIT=%s", msg.X, msg.Y, key)
 	return m, nil
+}
+
+func (m Model) hitTestTicketAt(snap *state.State, screenX, screenY int) (string, bool, string) {
+	if snap == nil {
+		return "", false, "snap=nil"
+	}
+	canvasW := m.width
+	if canvasW <= 0 {
+		canvasW = defaultTerminalWidth
+	}
+	canvasY := screenY - headerRows
+	if screenX < 0 || screenX >= canvasW || canvasY < 0 || canvasY >= m.canvasHeight() {
+		return "", false, fmt.Sprintf("outside-canvas canvasY=%d", canvasY)
+	}
+
+	boxes := m.ticketHitBoxes(snap)
+	key, found := uispatial.HitTest(boxes, m.zOrder, screenX, canvasY)
+	return key, found, formatHitBoxes(boxes)
+}
+
+func (m Model) ticketHitBoxes(snap *state.State) []uispatial.Positioned {
+	boxes := make([]uispatial.Positioned, 0, len(snap.Tickets))
+	for _, k := range m.zOrder {
+		ticket, ok := snap.Tickets[k]
+		if !ok {
+			continue
+		}
+		w, h := m.renderedTicketSize(snap, k, ticket)
+		if w <= 0 || h <= 0 {
+			continue
+		}
+		boxes = append(boxes, uispatial.Positioned{
+			ID: k,
+			X:  ticket.X,
+			Y:  ticket.Y,
+			W:  w,
+			H:  h,
+		})
+	}
+	return boxes
+}
+
+func (m Model) renderedTicketSize(snap *state.State, key string, ticket state.TicketState) (int, int) {
+	canvasW := m.width
+	if canvasW <= 0 {
+		canvasW = defaultTerminalWidth
+	}
+	width := cardWidth(canvasW)
+	rendered := renderTicket(renderTicketParams{
+		ticket:       ticketStateToUI(ticket, m.activatingTickets[key], state.ActivationCount(snap, key)),
+		isSelected:   key == m.selectedKey,
+		filteredOut:  m.ticketFilteredOut(ticket),
+		width:        width,
+		accentColor:  defaultColors().primary,
+		colors:       defaultColors(),
+		spinnerGlyph: m.spinnerGlyph(),
+	})
+	lines := strings.Split(rendered, "\n")
+	maxW := 0
+	for _, line := range lines {
+		if w := lipgloss.Width(line); w > maxW {
+			maxW = w
+		}
+	}
+	return maxW, len(lines)
+}
+
+func formatHitBoxes(boxes []uispatial.Positioned) string {
+	if len(boxes) == 0 {
+		return " none"
+	}
+	var b strings.Builder
+	for _, box := range boxes {
+		fmt.Fprintf(&b, " %s=(%d,%d)-(%d,%d)", box.ID, box.X, box.Y, box.X+box.W, box.Y+box.H)
+	}
+	return b.String()
 }
 
 // handleMouseMotion updates drag state when cursor moves while a drag is in flight.
@@ -114,7 +168,8 @@ func (m Model) handleMouseMotion(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if snap, _ := m.store.Snapshot(); snap != nil {
 		if t, ok := snap.Tickets[ds.key]; ok {
 			nx, ny := uispatial.ApplyDelta(t.X, t.Y, ds.pressX, ds.pressY, msg.X, msg.Y)
-			nx, ny = uispatial.Clamp(nx, ny, cardWidth(m.width), cardHeight(), m.width, m.canvasHeight())
+			cardW, cardH := m.dragCardSize(snap, ds.key)
+			nx, ny = uispatial.Clamp(nx, ny, cardW, cardH, m.canvasWidth(), m.canvasHeight())
 			ds.currentX, ds.currentY = nx, ny
 		}
 	}
@@ -159,7 +214,8 @@ func (m Model) handleMouseRelease(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	newX, newY := uispatial.ApplyDelta(card.X, card.Y, pressX, pressY, msg.X, msg.Y)
-	newX, newY = uispatial.Clamp(newX, newY, cardWidth(m.width), cardHeight(), m.width, m.canvasHeight())
+	cardW, cardH := m.dragCardSize(snap, key)
+	newX, newY = uispatial.Clamp(newX, newY, cardW, cardH, m.canvasWidth(), m.canvasHeight())
 
 	if err := m.store.Mutate(func(s *state.State) error {
 		state.SetTicketPosition(s, key, newX, newY)
@@ -180,4 +236,23 @@ func (m Model) handleMouseRelease(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // Post-it cards are approximately 5 lines tall (border + header + title + labels + margin).
 func cardHeight() int {
 	return 5
+}
+
+func (m Model) canvasWidth() int {
+	if m.width <= 0 {
+		return defaultTerminalWidth
+	}
+	return m.width
+}
+
+func (m Model) dragCardSize(snap *state.State, key string) (int, int) {
+	if snap != nil {
+		if ticket, ok := snap.Tickets[key]; ok {
+			w, h := m.renderedTicketSize(snap, key, ticket)
+			if w > 0 && h > 0 {
+				return w, h
+			}
+		}
+	}
+	return cardWidth(m.canvasWidth()), cardHeight()
 }
