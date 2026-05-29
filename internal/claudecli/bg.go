@@ -115,9 +115,9 @@ func redactArgv(argv []string) []string {
 // focus (not on every tick) to avoid hammering the claude CLI.
 //
 // shortID is the 8-hex-char identifier stored in ActivationEntry.ClaudeShortID.
-// worktree is the absolute path to the git linked worktree (passed as --cwd filter).
+// worktree is the absolute path to the git linked worktree, used to scope the query.
 //
-// A fresh `claude agents --json --cwd <worktree>` is issued on every call; there is no
+// A fresh agent-list query (via Agents) is issued on every call; there is no
 // in-process caching here. The caller (picker focus handler in M-008) is responsible
 // for caching the result in the BubbleTea model between keypresses.
 func IsOrphan(ctx context.Context, worktree, shortID string) (bool, error) {
