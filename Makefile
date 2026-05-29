@@ -2,10 +2,13 @@ BINARY := cmux-board
 GO := go
 COVERAGE_FILE := coverage.out
 
-.PHONY: build test lint clean coverage test-integration test-e2e verify-additive
+.PHONY: build install test lint clean coverage test-integration test-e2e verify-additive
 
 build:
 	$(GO) build -o $(BINARY) ./cmd/cmux-board
+
+install:
+	$(GO) install ./cmd/cmux-board
 
 test: verify-additive
 	$(GO) test -race ./...

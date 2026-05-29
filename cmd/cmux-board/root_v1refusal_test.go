@@ -16,18 +16,17 @@ func setConfigDirEnv(t *testing.T, dir string) {
 	t.Setenv(config.EnvConfigDir, dir)
 }
 
-func TestRootV1Refusal_V1ConfigRefusesAllSubcommands(t *testing.T) {
+func TestRootV1Refusal_V1ConfigRefusesRun(t *testing.T) {
 	dir := t.TempDir()
 	setConfigDirEnv(t, dir)
 	if err := os.WriteFile(filepath.Join(dir, config.ConfigFileName), []byte(`{"schema_version":1}`), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	// dock subcommand should be refused.
-	rootCmd.SetArgs([]string{"dock"})
+	rootCmd.SetArgs([]string{})
 	err := rootCmd.Execute()
 	if err == nil {
-		t.Fatal("expected schema v1 error for dock command")
+		t.Fatal("expected schema v1 error")
 	}
 	if !errors.Is(err, config.ErrSchemaV1) && !strings.Contains(err.Error(), "schema v1 detected") {
 		t.Errorf("expected 'schema v1 detected', got: %v", err)
