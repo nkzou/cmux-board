@@ -213,7 +213,3 @@ func indexActivation(entries []state.ActivationEntry, activationID string) int {
 	}
 	return 0
 }
-
-func (r *realClaudeCli) Respawn(ctx context.Context, args claudecli.BGArgs) (claudecli.BGResult, error) {
-	return claudecli.Respawn(ctx, args)
-}
