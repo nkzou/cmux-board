@@ -13,6 +13,7 @@ var rootCmd = &cobra.Command{
 	Long: `cmux-board renders an issue-tracker kanban board in the terminal and lets
 you activate any ticket to spawn a dedicated cmux workspace with a Claude Code
 agent pane and a worktree shell pane.`,
+	RunE: runDock,
 }
 
 func main() {

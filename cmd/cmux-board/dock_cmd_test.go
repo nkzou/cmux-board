@@ -70,11 +70,11 @@ func makeTestState(t *testing.T, dir string) {
 	writeJSON(t, filepath.Join(dir, "state.json"), st, 0644)
 }
 
-// makeDockCmd returns a new dockCmd with the given RunE and injected deps for testing.
-// It wires the --unsafe-creds and --log-level flags.
+// makeDockCmdWithDeps returns a root-like command with injected deps for testing.
+// It wires the --unsafe-creds, --log-level, and --debug flags.
 func makeDockCmdWithDeps(deps dockDeps) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "dock",
+		Use: "cmux-board",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDockWithDeps(cmd, args, deps)
 		},

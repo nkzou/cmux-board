@@ -22,21 +22,13 @@ import (
 	"github.com/nkzou/cmux-board/internal/ui"
 )
 
-var dockCmd = &cobra.Command{
-	Use:   "dock",
-	Short: "Start the cmux-board kanban board",
-	Long:  "Launch the cmux-board kanban board in the current terminal.",
-	RunE:  runDock,
-}
-
 func init() {
-	dockCmd.Flags().Bool("unsafe-creds", false,
+	rootCmd.Flags().Bool("unsafe-creds", false,
 		"bypass credentials.json mode-bit check (for development only)")
-	dockCmd.Flags().String("log-level", "info",
+	rootCmd.Flags().String("log-level", "info",
 		"log level: debug, info, warn, error")
-	dockCmd.Flags().Bool("debug", false,
+	rootCmd.Flags().Bool("debug", false,
 		"show mouse-event counters and last-drag diagnostic in the status bar")
-	rootCmd.AddCommand(dockCmd)
 }
 
 // dockDeps holds injectable dependencies for testing. Production code uses prodDockDeps.
