@@ -21,7 +21,7 @@ staticcheck ./...     # Static analysis
 |------|----------|
 | Add CLI command | `cmd/cmux-board/` |
 | Modify UI/keybindings | `internal/ui/` |
-| Change sync/poll behavior | `internal/sync/` |
+| Change poll/refresh behavior | `internal/refresh/` |
 | Jira adapter | `internal/tracker/jira/` |
 | State persistence | `internal/state/` |
 | Configuration | `internal/config/` |
@@ -35,7 +35,7 @@ staticcheck ./...     # Static analysis
 cmd/cmux-board/      CLI entry (cobra): init, dock, repos
 internal/
   ui/                BubbleTea Model - central orchestrator
-  sync/              Poller, push, backoff, bridge, merge
+  refresh/           Read-only poller (refreshes existing tickets, backoff)
   tracker/           IssueTracker interface
   tracker/jira/      Jira Cloud adapter
   state/             Atomic JSON store (Mutate/Snapshot)
@@ -54,7 +54,7 @@ internal/
 `ui.handleEnter()` -> `activate()` -> `git.CreateWorktreeAt()` -> `claudecli.LaunchBackground()` -> `cmuxcli.NewWorkspaceWithLayout()` -> `cmuxcli.FocusPane()`
 
 **Background poll:**
-`sync.NewPoller()` -> `bridge.EmitFn()` -> `bridge.RunPushWorker()` -> `tea.Program.Send()`
+`refresh.NewRefresher()` -> `runLoop()` ticks -> `emit(ui.PollOKMsg/PollErrMsg)` -> `tea.Program.Send()`
 
 **State mutation:**
 Any goroutine -> `store.Mutate(func(s *state.State) error {...})` -> atomic JSON write

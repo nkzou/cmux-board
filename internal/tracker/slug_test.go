@@ -1,4 +1,4 @@
-package jira
+package tracker
 
 import "testing"
 
@@ -15,6 +15,9 @@ func TestSlug(t *testing.T) {
 		{"a--b---c", "a-b-c"},
 		{"", ""},
 		{"UPPER CASE 123!", "upper-case-123"},
+		{"MyService", "myservice"},
+		{"cmux-board", "cmux-board"},
+		{"  Weird  State  ", "weird-state"},
 	}
 
 	for _, tt := range tests {

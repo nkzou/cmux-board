@@ -12,7 +12,7 @@ import (
 	"github.com/nkzou/cmux-board/internal/ui"
 )
 
-// minRefreshInterval is the hard floor for refresh intervals, matching sync/poller.go.
+// minRefreshInterval is the hard floor for refresh intervals (10s).
 const minRefreshInterval = 10 * time.Second
 
 // Config holds the configuration for a Refresher.

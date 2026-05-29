@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nkzou/cmux-board/internal/atomicfile"
 	"github.com/nkzou/cmux-board/internal/config"
 	"github.com/nkzou/cmux-board/internal/state"
 )
@@ -74,7 +75,7 @@ func Finalize(ctx context.Context, w io.Writer, r io.Reader, input WizardInput, 
 	if err != nil {
 		return fmt.Errorf("failed to marshal config.json: %w", err)
 	}
-	if err := config.WriteFileAtomic(cfgPath, cfgData, 0644); err != nil {
+	if err := atomicfile.WriteFile(cfgPath, cfgData, 0644); err != nil {
 		return fmt.Errorf("failed to write config.json: %w", err)
 	}
 
@@ -85,7 +86,7 @@ func Finalize(ctx context.Context, w io.Writer, r io.Reader, input WizardInput, 
 	if err != nil {
 		return fmt.Errorf("failed to marshal state.json: %w", err)
 	}
-	if err := config.WriteFileAtomic(statePath, stateData, 0644); err != nil {
+	if err := atomicfile.WriteFile(statePath, stateData, 0644); err != nil {
 		return fmt.Errorf("failed to write state.json: %w", err)
 	}
 
@@ -96,7 +97,7 @@ func Finalize(ctx context.Context, w io.Writer, r io.Reader, input WizardInput, 
 	if err != nil {
 		return fmt.Errorf("failed to marshal credentials.json: %w", err)
 	}
-	if err := config.WriteFileAtomic(credsPath, credsData, 0600); err != nil {
+	if err := atomicfile.WriteFile(credsPath, credsData, 0600); err != nil {
 		return fmt.Errorf("failed to write credentials.json: %w", err)
 	}
 	if err := os.Chmod(credsPath, 0600); err != nil {

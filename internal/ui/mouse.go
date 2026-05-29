@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/nkzou/cmux-board/internal/state"
-	uispatial "github.com/nkzou/cmux-board/internal/ui/spatial"
 )
 
 // handleMouseMsg routes tea.MouseMsg to the appropriate press/motion/release handler.
@@ -87,12 +86,12 @@ func (m Model) hitTestTicketAt(snap *state.State, screenX, screenY int) (string,
 	}
 
 	boxes := m.ticketHitBoxes(snap)
-	key, found := uispatial.HitTest(boxes, m.zOrder, screenX, canvasY)
+	key, found := HitTest(boxes, m.zOrder, screenX, canvasY)
 	return key, found, formatHitBoxes(boxes)
 }
 
-func (m Model) ticketHitBoxes(snap *state.State) []uispatial.Positioned {
-	boxes := make([]uispatial.Positioned, 0, len(snap.Tickets))
+func (m Model) ticketHitBoxes(snap *state.State) []Positioned {
+	boxes := make([]Positioned, 0, len(snap.Tickets))
 	for _, k := range m.zOrder {
 		ticket, ok := snap.Tickets[k]
 		if !ok {
@@ -102,7 +101,7 @@ func (m Model) ticketHitBoxes(snap *state.State) []uispatial.Positioned {
 		if w <= 0 || h <= 0 {
 			continue
 		}
-		boxes = append(boxes, uispatial.Positioned{
+		boxes = append(boxes, Positioned{
 			ID: k,
 			X:  ticket.X,
 			Y:  ticket.Y,
@@ -138,7 +137,7 @@ func (m Model) renderedTicketSize(snap *state.State, key string, ticket state.Ti
 	return maxW, len(lines)
 }
 
-func formatHitBoxes(boxes []uispatial.Positioned) string {
+func formatHitBoxes(boxes []Positioned) string {
 	if len(boxes) == 0 {
 		return " none"
 	}
@@ -167,9 +166,9 @@ func (m Model) handleMouseMotion(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// the key (rare race), fall back to the previously computed currentX/Y.
 	if snap, _ := m.store.Snapshot(); snap != nil {
 		if t, ok := snap.Tickets[ds.key]; ok {
-			nx, ny := uispatial.ApplyDelta(t.X, t.Y, ds.pressX, ds.pressY, msg.X, msg.Y)
+			nx, ny := ApplyDelta(t.X, t.Y, ds.pressX, ds.pressY, msg.X, msg.Y)
 			cardW, cardH := m.dragCardSize(snap, ds.key)
-			nx, ny = uispatial.Clamp(nx, ny, cardW, cardH, m.canvasWidth(), m.canvasHeight())
+			nx, ny = Clamp(nx, ny, cardW, cardH, m.canvasWidth(), m.canvasHeight())
 			ds.currentX, ds.currentY = nx, ny
 		}
 	}
@@ -193,7 +192,7 @@ func (m Model) handleMouseRelease(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	m.dragging = nil
 
 	// Promote key to top of zOrder regardless of click vs. drag (Review F-06).
-	m.zOrder = uispatial.ZOrder(m.zOrder, key)
+	m.zOrder = ZOrder(m.zOrder, key)
 
 	if !motion {
 		// Click-release: select and activate.
@@ -213,9 +212,9 @@ func (m Model) handleMouseRelease(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.dragDebug = fmt.Sprintf("release DRAG missing key=%s", key)
 		return m, nil
 	}
-	newX, newY := uispatial.ApplyDelta(card.X, card.Y, pressX, pressY, msg.X, msg.Y)
+	newX, newY := ApplyDelta(card.X, card.Y, pressX, pressY, msg.X, msg.Y)
 	cardW, cardH := m.dragCardSize(snap, key)
-	newX, newY = uispatial.Clamp(newX, newY, cardW, cardH, m.canvasWidth(), m.canvasHeight())
+	newX, newY = Clamp(newX, newY, cardW, cardH, m.canvasWidth(), m.canvasHeight())
 
 	if err := m.store.Mutate(func(s *state.State) error {
 		state.SetTicketPosition(s, key, newX, newY)

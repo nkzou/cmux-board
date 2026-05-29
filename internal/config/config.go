@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/nkzou/cmux-board/internal/atomicfile"
 )
 
 // SchemaVersionCurrent is the only schema version written by this binary.
@@ -85,7 +87,7 @@ func Save(path string, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	return WriteFileAtomic(path, data, 0644)
+	return atomicfile.WriteFile(path, data, 0644)
 }
 
 // ParseAdapterColumns reads the "columns" key from an adapter_config map and returns

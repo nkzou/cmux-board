@@ -1,10 +1,11 @@
-// Package spatial provides pure-Go geometry helpers for the freeform 2D board.
-// It has no BubbleTea, Lipgloss, or bubblezone dependencies.
-package spatial
+package ui
+
+// Pure-Go geometry helpers for the freeform 2D board.
+// No BubbleTea, Lipgloss, or bubblezone dependencies.
 
 import "math"
 
-// Positioned is a lightweight card-rect record passed in from internal/ui.
+// Positioned is a lightweight card-rect record used for hit-testing.
 type Positioned struct {
 	ID   string
 	X, Y int

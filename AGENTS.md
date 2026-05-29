@@ -12,7 +12,7 @@ cmux-board/
 cmd/cmux-board/      # CLI (Cobra): init, dock, repos
 internal/
   ui/                # BubbleTea Model/View/Update (central orchestrator)
-  sync/              # Poller, push handler, backoff, bridge, merge
+  refresh/           # Read-only poller (refreshes existing tickets, backoff)
   tracker/           # IssueTracker interface
   tracker/jira/      # Jira Cloud adapter
   state/             # State store (atomic JSON, Mutate/Snapshot)
@@ -32,8 +32,7 @@ docs/                # Design docs, smoke test, coverage table
 |------|----------|-------|
 | Add keybinding | `internal/ui/keymap.go` | Dispatch by mode in `handleNormalMode()` |
 | New UI mode | `internal/ui/model.go` | Add Mode const, create handler |
-| Change poll behavior | `internal/sync/poller.go` | Backoff in `internal/sync/backoff.go` |
-| Card-move push | `internal/sync/push.go` | OCC emulator; DryRun gate |
+| Change poll behavior | `internal/refresh/refresh.go` | Backoff in `internal/refresh/backoff.go` |
 | Activation flow | `internal/ui/activate.go` | ActivationHooks fault-injection seam |
 | Jira client | `internal/tracker/jira/client.go` | Auth header injected via `Do()` |
 | State mutations | `internal/state/store.go` | ALL mutations via `store.Mutate()` |
@@ -49,7 +48,7 @@ docs/                # Design docs, smoke test, coverage table
 | `View()` | method | `internal/ui/view.go` | All rendering |
 | `Store` | struct | `internal/state/store.go` | Atomic JSON store (Mutate/Snapshot) |
 | `ActivationHooks` | struct | `internal/ui/activate.go` | Fault-injection seam |
-| `Bridge` | struct | `internal/sync/bridge.go` | BubbleTea-poller channel bridge |
+| `Refresher` | struct | `internal/refresh/refresh.go` | Read-only background ticket refresher |
 | `IssueTracker` | interface | `internal/tracker/tracker.go` | Adapter contract |
 | `Client` | struct | `internal/tracker/jira/client.go` | Jira HTTP client with auth |
 | `ReconcileIncompleteActivations` | func | `internal/runtime/reconcile.go` | Startup resource harvest |
@@ -92,9 +91,6 @@ Config directory override for test isolation:
 ```bash
 CMUX_BOARD_CONFIG_DIR=/tmp/test cmux-board dock
 ```
-
-All tests in `internal/state/` that import `internal/sync` must use `package state_test`
-(external test package) to avoid circular imports.
 
 Race detector is mandatory: `go test -race ./...` must pass.
 

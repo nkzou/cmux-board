@@ -19,7 +19,7 @@ git worktree, a background claude agent, and a cmux workspace with two panes.
 cmd/cmux-board/        cobra CLI; init, dock, repos subcommands
 internal/
   ui/                  BubbleTea Model, overlays, keymap, modes
-  sync/                Poller, push handler, MergePulledTickets, bridge
+  refresh/             Read-only poller that refreshes existing tickets
   tracker/             IssueTracker port + Capabilities
   tracker/jira/        Jira Cloud v1 REST adapter
   cmuxcli/             cmux shellout wrappers (additive-only)
@@ -40,7 +40,7 @@ Enforced by `scripts/check_additive_only.sh`:
 1. cmux is additive-only. Production code never calls `cmux close-workspace` or `cmux kill`.
 2. `claude --bg` uses `exec.Cmd.Dir` for the working directory. `--cwd` is never used.
 3. cmux focus uses `cmux focus-pane`. Bare `cmux focus` is not called.
-4. `MergePulledTickets` is the only path that writes the `Tickets` map in state.
+4. The refresh poll (`internal/refresh`) is the only path that writes the `Tickets` map, via `store.Mutate`.
 5. No direct `*State` field mutation outside store files -- all writes go through `store.Mutate`.
 6. HTTP headers are never logged (token redaction boundary).
 7. `git status` is never called in focus or activate paths (avoids dirty-worktree stalls).
